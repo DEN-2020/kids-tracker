@@ -1,0 +1,366 @@
+/* Tasks.module.css */
+
+/* Контейнер прогресса */
+.statsCard {
+  background: var(--card-bg);
+  padding: 20px;
+  border-radius: 28px;
+  margin-bottom: 25px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+}
+
+.statsInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 14px;
+  background-color: var(--bg-color);
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+
+.progressFill {
+  height: 100%;
+  transition: width 0.5s ease-out;
+}
+
+/* Карточка задачи "В работе" */
+.activeTaskCard {
+  padding: 20px;
+  background-color: var(--card-bg);
+  border-radius: 24px;
+  border: 2px solid var(--accent-green);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Сетка доступных задач */
+.tasksGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 15px;
+}
+
+/* Базовая карточка доступной задачи */
+
+
+.taskCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  
+  border-radius: 24px;  
+  
+  background-color: var(--card-bg);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  user-select: none;
+  -webkit-user-select: none;
+  border: 2px solid var(--accent-blue);
+}
+
+.taskCardUrgent {
+  border-color: var(--accent-orange);
+}
+
+/* Состояние ожидания (когда запрос отправлен) */
+.taskWaiting {
+  background-color: var(--bg-color);
+  cursor: default;
+  border: 2px dashed var(--border-color);
+  opacity: 0.7;
+  filter: grayscale(0.5);
+  pointer-events: none;
+}
+
+.deadlineTag {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.taskIcon {
+  font-size: 40px;
+  margin-bottom: 5px;
+}
+
+.taskLabel {
+  font-size: 14px;
+  font-weight: bold;
+  text-align: center;
+  color: var(--text-main);
+}
+
+.taskPoints {
+  color: var(--accent-blue);
+  font-weight: bold;
+}
+
+.waitingText {
+  color: var(--text-secondary);
+}
+
+/* Монетки */
+.coin {
+  position: fixed;
+  top: -50px;
+  font-size: 24px;
+  z-index: 9999;
+  pointer-events: none;
+  animation: fall 1.2s linear forwards;
+}
+
+@keyframes fall {
+  to { transform: translateY(110vh) rotate(360deg); }
+}
+
+/* Тряска для магазина, когда не хватает баллов */
+.insufficientFunds {
+  animation: shakeInsufficient 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  border: 2px solid #ff5252 !important;
+}
+
+/* Анимация сильной тряски при удержании */
+.shakingIntense {
+  animation: shakeIntense 0.5s infinite;
+}
+
+@keyframes shakeIntense {
+  0% { transform: translate(1px, 1px) rotate(0deg); }
+  20% { transform: translate(-1px, -2px) rotate(-1deg); }
+  40% { transform: translate(-3px, 0px) rotate(1deg); }
+  60% { transform: translate(3px, 2px) rotate(0deg); }
+  80% { transform: translate(1px, -1px) rotate(1deg); }
+  100% { transform: translate(-1px, 2px) rotate(-1deg); }
+}
+
+/* Тряска ошибки (красная), если не хватает денег */
+.insufficient {
+  animation: shakeError 0.4s;
+  border: 2px solid #ff5252 !important;
+}
+
+@keyframes shakeError {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Анимация заполнения полоски */
+@keyframes fillProgress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.fillProgressBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: var(--accent-orange);
+  width: 100%;
+  transform-origin: left;
+  animation: fillProgress 2s linear forwards;
+}
+
+/* Анимация тряски (если её еще нет) */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px) rotate(-1deg); }
+  75% { transform: translateX(2px) rotate(1deg); }
+}
+
+.shaking {
+  animation: shake 0.2s infinite;
+}
+
+.shaking {
+  animation: shakeSmall 0.1s infinite;
+}
+
+@keyframes shakeSmall {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  25% { transform: translate(1px, 1px) rotate(0.5deg); }
+  50% { transform: translate(0px, -1px) rotate(-0.5deg); }
+  75% { transform: translate(-1px, 1px) rotate(0.5deg); }
+  100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+/* Стекло для достижений */
+.glassCard {
+  position: relative;
+  padding: 20px;
+  border-radius: 24px;
+  /* Полупрозрачный фон */
+  background: rgba(255, 255, 255, 0.05);
+  /* Эффект размытия заднего фона */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  /* Тонкая светящаяся граница */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  transition: all 0.4s ease;
+  overflow: hidden;
+}
+
+/* Состояние, когда достижение разблокировано */
+.glassCardUnlocked {
+  background: rgba(255, 152, 0, 0.1); /* Легкий оттенок оранжевого */
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  /* Мягкое внешнее свечение вместо жирной рамки */
+  box-shadow: 0 0 20px rgba(255, 152, 0, 0.15), 
+              inset 0 0 12px rgba(255, 152, 0, 0.05);
+}
+
+/* Эффект при активации (удержании) */
+.glassCardHolding {
+  transform: scale(0.98);
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Полоска прогресса (сделаем её неоновой) */
+.neonProgressBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, var(--accent-green), #fff);
+  box-shadow: 0 0 15px var(--accent-green);
+  width: 100%;
+  transform-origin: left;
+  animation: fill5sec 5s linear forwards;
+  z-index: 10;
+}
+
+/* Анимация заполнения 5 сек */
+@keyframes fill5sec {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* Tasks.module.css */
+
+/* Анимация заполнения полоски при удержании */
+@keyframes fillHold {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.holdProgress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 6px;
+  background: var(--accent-orange);
+  width: 100%;
+  transform-origin: left;
+  animation: fillHold 5s linear forwards;
+}
+
+/* Сильная тряска при покупке */
+@keyframes intenseShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px) rotate(-1deg); }
+  75% { transform: translateX(4px) rotate(1deg); }
+}
+
+.shakingIntense {
+  animation: intenseShake 0.2s infinite;
+  border-color: var(--accent-orange) !important;
+}
+
+/* Красная тряска при нехватке средств */
+.insufficientFunds {
+  animation: intenseShake 0.4s ease;
+  border-color: #ff4444 !important;
+  background: #fff1f1 !important;
+}
+
+/* Tasks.module.css */
+
+/* Стили для магазина */
+.shopCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background-color: var(--card-bg);
+  border-radius: 24px;
+  border: 2px solid var(--accent-green);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: center;
+  overflow: hidden;
+}
+
+.shopCardAffordable {
+  border-color: var(--accent-green);
+  opacity: 1;
+}
+
+.shopCardLocked {
+  border-color: var(--border-color);
+  opacity: 0.6;
+}
+
+.holdProgress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 6px;
+  background: var(--accent-orange);
+  width: 100%;
+  transform-origin: left;
+  animation: fill5sec 5s linear forwards;
+}
+
+.priceBadge {
+  margin-top: 10px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  color: white;
+  font-weight: bold;
+  font-size: 13px;
+  display: inline-block;
+}
+
+.tasksGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 15px;
+  padding: 10px;
+}
+
+.shopCard {
+  background: var(--card-bg);
+  border-radius: 20px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.priceBadge {
+  margin-top: 10px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: white;
+}

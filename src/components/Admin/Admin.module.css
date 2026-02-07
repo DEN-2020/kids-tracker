@@ -1,0 +1,451 @@
+/* Admin.module.css */
+/* Убираем ограничение в 600px для ПК */
+.panelContainer {
+  max-width: 1200px; 
+  margin: 0 auto;
+  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ДОБАВЬ ЭТО: */
+@media (max-width: 600px) {
+  .panelContainer {
+    padding-left: 0;
+    padding-right: 0;
+    padding-top: 10px; /* Можно оставить немного сверху */
+  }
+}
+
+/* Сетка для верхней части */
+.topLayout {
+  display: grid;
+  grid-template-columns: 1fr; /* По умолчанию (телефон) - одна колонка */
+  gap: 20px;
+  align-items: start;
+}
+/* Когда экран больше 900px (ПК), включаем две колонки */
+@media (min-width: 900px) {
+  .topLayout {
+    grid-template-columns: 1fr 1fr; /* Лево и Право поровну */
+    gap: 30px;
+  }
+}
+
+.leftCol, .rightCol {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card {
+  background: var(--card-bg);
+  padding: 20px;
+  border-radius: 28px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+  margin-bottom: 25px;
+}
+
+.statsHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+
+.progressBar {
+  width: 100%;
+  height: 10px;
+  background-color: var(--border-color);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  transition: width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.clearButton {
+  width: 100%;
+  padding: 10px;
+  background-color: transparent;
+  color: #ff5252;
+  border: 1px solid #ff5252;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-bottom: 20px;
+  opacity: 0.7;
+}
+
+.requestItem {
+  padding: 15px;
+  background-color: var(--card-bg);
+  border-radius: 24px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow);
+}
+
+/* Дополнения для Admin.module.css */
+.formHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.formAvatar { font-size: 30px; }
+
+.targetChild {
+  font-size: 12px;
+  color: var(--accent-blue);
+  font-weight: bold;
+}
+
+.mainForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inputRow {
+  display: flex;
+  gap: 10px;
+}
+
+.iconInput {
+  width: 55px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-color);
+  text-align: center;
+  font-size: 20px;
+}
+
+.labelInput {
+  flex: 1;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-color);
+  color: var(--text-main);
+  font-weight: bold;
+}
+
+.numberInput, .iconInput, .inputGroup input {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-color);
+  color: var(--text-main);
+  font-size: 14px;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+
+
+.labelInput:focus, .inputGroup input:focus {
+  border-color: var(--accent-blue);
+  outline: none;
+}
+
+.gridRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.inputHint {
+  font-size: 10px;
+  color: var(--text-secondary);
+  margin-left: 10px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.numberInput {
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-color);
+  color: var(--text-main);
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 8px;
+}
+
+.actionButton {
+  flex: 1;
+  padding: 12px 5px;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.actionIcon { font-size: 22px; }
+.actionLabel { font-size: 10px; font-weight: bold; text-transform: uppercase; }
+
+.submitBtn {
+  padding: 16px;
+  background: var(--accent-blue);
+  color: white;
+  border: none;
+  border-radius: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 16px;
+  transition: transform 0.1s;
+}
+
+/* Контейнер для списка задач */
+.templatesContainer {
+  display: grid;
+  /* Эта магия говорит: делай колонки минимум по 300px, 
+     но если они не влезают — переноси на новую строку */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  width: 100%;
+}
+
+.templateItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--card-bg);
+  border-radius: 18px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+}
+
+.templateSelected {
+  border: 1px solid var(--accent-blue);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.templateInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.templateIcon { font-size: 24px; }
+.templateLabel { font-weight: bold; font-size: 14px; color: var(--text-main); }
+.templateSub { font-size: 11px; color: var(--text-secondary); }
+
+.templateActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.copyBtn {
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--text-main);
+}
+
+.deleteBtn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  opacity: 0.3;
+  color: var(--text-main);
+  padding: 0 5px;
+}
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 15px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.templateItem {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow);
+  transition: transform 0.2s;
+}
+
+.templateSelected {
+  background: var(--card-bg); /* или чуть светлее */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* Главный контейнер для групп (вертикальный стек) */
+.templatesRoot {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: 100%;
+  margin-top: 20px;
+}
+
+/* Секция одного ребенка */
+.groupSection {
+  width: 100%;
+}
+
+/* Заголовок с именем и линией */
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.headerLine {
+  flex: 1;
+  height: 1px;
+  background: #eee; /* Цвет линии */
+}
+
+/* СЕТКА КАРТОЧЕК: сама решает сколько колонок влезет */
+.gridContainer {
+  display: grid;
+  /* repeat(auto-fill) создает колонки по 280px пока есть место в ширину */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+/* Сама карточка задания */
+.templateItem {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+/* Подсветка для выбранного ребенка */
+.templateSelected {
+  border-left: 4px solid var(--accent-blue) !important;
+  background: rgba(33, 150, 243, 0.03);
+}
+
+.templateInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.templateIcon {
+  font-size: 24px;
+}
+
+.templateLabel {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.templateSub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.templateActions {
+  display: flex;
+  gap: 8px;
+}
+
+.copyBtn, .deleteBtn {
+  background: var(--border-color);
+  border: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: opacity 0.2s;
+}
+
+.copyBtn:hover, .deleteBtn:hover {
+  opacity: 0.8;
+}
+
+.deleteBtn {
+  color: #ff5252;
+}
+
+/* Адаптивность для мобилок */
+@media (max-width: 480px) {
+  .gridContainer {
+    grid-template-columns: 1fr; /* На узких телефонах всегда одна колонка */
+  }
+  
+  .templateItem {
+    padding: 10px 12px;
+  }
+}
+
+/* Эффект легкого покачивания для карточек магазина */
+.shopCard {
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+}
+
+.shopCard:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+/* Тряска если нельзя купить (недостаточно баллов) */
+@keyframes shakeError {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+
+.insufficientFunds {
+  animation: shakeError 0.4s ease-in-out;
+  border-color: #ff5252 !important;
+}

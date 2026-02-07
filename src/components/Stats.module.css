@@ -1,0 +1,80 @@
+.container {
+  padding: 20px;
+  background: var(--card-bg);
+  border-radius: 24px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+  min-height: 400px;
+}
+
+.title {
+  color: var(--text-main);
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chartContainer {
+  width: 100%;
+  height: 250px;
+  position: relative;
+}
+
+.emptyState {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+}
+
+.statsGrid {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.statCard {
+  text-align: center;
+  padding: 15px;
+  background: var(--bg-color);
+  border-radius: 16px;
+  border: 1px solid var(--border-color);
+}
+
+.statValue {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.logSection {
+  margin-top: 30px;
+}
+
+.logTitle {
+  color: var(--text-secondary);
+  margin-bottom: 15px;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.logList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.logItem {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background-color: var(--bg-color);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
