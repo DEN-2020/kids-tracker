@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import type { TranslationContent } from '../../translations';
@@ -27,6 +27,17 @@ export const RegisterPage = ({ googleUid, initialName, onSuccess, t }: RegisterP
   const [avatar, setAvatar] = useState('👶');
   const [loading, setLoading] = useState(false);
   const [familyCode, setFamilyCode] = useState('');
+
+useEffect(() => {
+    // Проверяем, нет ли сохраненного кода приглашения
+    const pendingCode = sessionStorage.getItem('pending_family_code');
+    if (pendingCode) {
+      setFamilyCode(pendingCode);
+      // Если код есть, обычно это ребенок вступает в семью
+      setRole('child'); 
+      setAvatar('👶');
+    }
+  }, []);
 
   const handleRegister = async () => {
     if (!name.trim()) return alert("Введите имя!");

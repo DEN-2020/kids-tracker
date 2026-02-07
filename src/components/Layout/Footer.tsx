@@ -1,4 +1,8 @@
 import React from 'react';
+// Импортируем версию из package.json (если конфиг позволяет)
+// Или просто задаем вручную, что даже надежнее для контроля
+const APP_VERSION = "1.0.2"; 
+const BUILD_DATE = "07.02.2026"; // Можешь обновлять вручную перед деплоем
 
 interface FooterProps {
   children: React.ReactNode;
@@ -20,13 +24,12 @@ export const Footer = ({ children }: FooterProps) => (
     flexDirection: 'column',
     alignItems: 'center',
     transition: 'background-color 0.4s ease, border-color 0.4s ease',
-    // Минимальный отступ для Safe Area, чтобы не «задирать» футер слишком высоко
     paddingBottom: 'env(safe-area-inset-bottom, 5px)' 
   }}>
     {children}
     
     <div style={{ 
-      padding: '4px 0 6px 0', // Очень компактные отступы
+      padding: '4px 0 6px 0',
       fontSize: '9px', 
       color: 'var(--text-secondary)', 
       textTransform: 'uppercase',
@@ -35,8 +38,7 @@ export const Footer = ({ children }: FooterProps) => (
       textAlign: 'center',
       width: '100%'
     }}>
-      {/* Всё в одну строку через разделитель */}
-      Kids Tracker 2026 • <span style={{ color: 'var(--accent-orange)', fontWeight: 'bold' }}>TEST MODE</span> • Cloud Synced
+      v.{APP_VERSION} ({BUILD_DATE}) • Kids Tracker • <span style={{ color: 'var(--accent-orange)', fontWeight: 'bold' }}>TEST MODE</span>
     </div>
   </footer>
 );
