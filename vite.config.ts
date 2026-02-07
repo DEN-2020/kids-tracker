@@ -42,6 +42,7 @@ export default defineConfig({
     target: 'esnext',
     minify: 'esbuild',
     sourcemap: false,
-    // МЫ УБРАЛИ rollupOptions, чтобы CSS грузился корректно одним файлом
+    emptyOutDir: true,
+   
   },
 })
