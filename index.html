@@ -1,24 +1,32 @@
 <!doctype html>
-<html lang="fi"> <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/kids-tracker/pwa-192x192.png" />
-    
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    
-    <title>Kids Tracker 2026</title>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8" />
+  <link rel="preload" as="image" href="/kids-tracker/pwa-192x192.png">
+  
+  <link rel="icon" type="image/png" href="/kids-tracker/pwa-192x192.png" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  
+  <title>Kids Tracker 2026</title>
 
-<meta name="mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="KidsTracker">
+  <link rel="apple-touch-icon" href="/kids-tracker/pwa-192x192.png">
 
-<meta name="apple-mobile-web-app-capable" content="yes">
-
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="KidsTracker">
-    <link rel="apple-touch-icon" href="/kids-tracker/pwa-192x192.png">
-
-    <meta name="theme-color" content="#007AFF">
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+  <meta name="theme-color" content="#007AFF">
+</head>
+<body style="margin: 0; background-color: #1a1a1a;"> 
+  <div id="root">
+    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #1a1a1a; font-family: -apple-system, system-ui, sans-serif;">
+      <div style="text-align: center;">
+        <img src="/kids-tracker/pwa-192x192.png" alt="Loading..." style="width: 80px; height: 80px; margin-bottom: 20px; border-radius: 20px;">
+        <div style="color: #007AFF; font-weight: 600; letter-spacing: 0.5px;">Ladataan...</div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
 </html>
