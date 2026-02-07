@@ -1,9 +1,15 @@
 import React from 'react';
 // Импортируем версию из package.json (если конфиг позволяет)
 // Или просто задаем вручную, что даже надежнее для контроля
-const APP_VERSION = "1.0.2"; 
-const BUILD_DATE = "07.02.2026"; // Можешь обновлять вручную перед деплоем
+// Берем версию прямо из файла package.json
+const APP_VERSION = import.meta.env.PACKAGE_VERSION || "1.0.2"; 
 
+// Автоматическая дата сборки (создается в момент запуска npm run build)
+const BUILD_DATE = new Date().toLocaleDateString('ru-RU', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric'
+});
 interface FooterProps {
   children: React.ReactNode;
 }

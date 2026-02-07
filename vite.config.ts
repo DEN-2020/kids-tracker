@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react-swc'
 import { VitePWA } from 'vite-plugin-pwa'
-
+import pkg from './package.json'
 export default defineConfig({
   plugins: [
     react(),
@@ -29,4 +29,8 @@ export default defineConfig({
     })
   ],
   base: '/kids-tracker/',
+  define: {
+    // Передаем версию из package.json в код приложения
+    'import.meta.env.PACKAGE_VERSION': JSON.stringify(pkg.version)
+  },
 })
