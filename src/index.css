@@ -44,6 +44,28 @@ body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   transition: background 0.4s ease, color 0.4s ease;
   -webkit-font-smoothing: antialiased;
+
+  /* Улучшения для PWA */
+  -webkit-tap-highlight-color: transparent; /* Убирает синюю рамку при нажатии на iOS */
+  -webkit-touch-callout: none;                /* Запрещает контекстное меню при долгом нажатии */
+  -webkit-user-select: none;                   /* Запрещает выделение текста везде... */
+  user-select: none;
+  
+  overflow-x: hidden;                          /* Защита от горизонтального скролла */
+  
+  /* Поддержка Safe Area (для iPhone с челкой) */
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Разрешаем выделение текста только там, где оно нужно (инпуты) */
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Фикс для плавности прокрутки на iOS */
+html {
+  -webkit-overflow-scrolling: touch;
 }
 
 body.parent-mode {
