@@ -7,6 +7,10 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg}'], // кэшируем все важные файлы
+        cleanupOutdatedCaches: true, // удаляем старый кэш автоматически
+      },
       manifest: {
         name: 'Kids Tracker 2026',
         short_name: 'KidsTracker',
