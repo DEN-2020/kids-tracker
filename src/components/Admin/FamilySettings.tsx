@@ -41,7 +41,7 @@ export const FamilySettings = ({ familyId, t, profile, lang, handleLogout }: {
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false); // Состояние для инструкции
 
-  const joinLink = `${window.location.origin}?join=${familyId}`;
+  const joinLink = `${window.location.origin}${window.location.pathname}?join=${familyId}`;
 
   useEffect(() => {
     const q = query(collection(db, "users"), where("familyId", "==", familyId));
