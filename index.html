@@ -2,27 +2,27 @@
 <html lang="fi">
 <head>
   <meta charset="UTF-8" />
-  <link rel="preload" as="image" href="/kids-tracker/login.avif" type="image/avif" fetchpriority="high">
+  <link rel="preload" as="image" href="login.avif" type="image/avif" fetchpriority="high">
   <link rel="icon" type="image/png" href="pwa-192x192.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Kids Tracker 2026</title>
-
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  
   <link rel="preconnect" href="https://identitytoolkit.googleapis.com">
   <link rel="preconnect" href="https://www.googleapis.com" crossorigin>
-  
   <meta name="theme-color" content="#007AFF">
-
   <link rel="stylesheet" href="/kids-tracker/assets/index-CxSf0rIm.css" media="print" onload="this.media='all'">
   
   <style>
-    /* Критические стили для лоадера и первого экрана */
     body {
-      margin: 0;
-      background-color: #000; /* Чтобы не было белой вспышки */
+    margin: 0;
+    background-color: #000;
+   
+    background-image: url('login.avif');
+    background-size: cover;
+    background-attachment: fixed;
+    background-position: center;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     }
     
@@ -54,7 +54,6 @@
       letter-spacing: 1px;
     }
 
-    /* Стили для формы (инлайним, чтобы не ждать CSS) */
     .authContainer { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; width: 100%; padding: 20px; box-sizing: border-box; }
     .glassForm { width: 100%; max-width: 340px; background: rgba(255, 255, 255, 0.08); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); padding: 30px; border-radius: 28px; border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 20px 40px rgba(0,0,0,0.4); display: flex; flex-direction: column; gap: 15px; box-sizing: border-box; }
   </style>
