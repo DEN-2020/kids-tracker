@@ -1,0 +1,180 @@
+:root {
+  /* Светлая тема: "Soft Porcelain" */
+  --bg-color: #f8fafc;
+  --card-bg: #ffffff;
+  --text-main: #0f172a;
+  --text-secondary: #64748b;
+  --border-color: #e2e8f0;
+  
+  --accent-blue: #6366f1;
+  --accent-green: #10b981;
+  --accent-orange: #f59e0b;
+  
+  --bg-parent-tint: #f1f5f9; 
+  --parent-gradient: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+
+  --nav-bg: rgba(255, 255, 255, 0.85);
+  --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+body.dark {
+  /* Темная тема: "Deep Space" */
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --text-main: #f8fafc;
+  --text-secondary: #94a3b8;
+  --border-color: #334155;
+  
+  --accent-blue: #818cf8;
+  --accent-green: #34d399;
+  --accent-orange: #fbbf24;
+
+  --bg-parent-tint: #020617;
+  --parent-gradient: radial-gradient(circle at top right, #1e293b, #0f172a, #020617);
+  
+  --nav-bg: rgba(30, 41, 59, 0.9);
+  --shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+}
+
+/* ОБЩИЕ СТИЛИ */
+body {
+  margin: 0;
+  background-color: transparent;
+  color: var(--text-main);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  transition: background 0.4s ease, color 0.4s ease;
+  -webkit-font-smoothing: antialiased;
+
+  /* Улучшения для PWA */
+  -webkit-tap-highlight-color: transparent; /* Убирает синюю рамку при нажатии на iOS */
+  -webkit-touch-callout: none;                /* Запрещает контекстное меню при долгом нажатии */
+  -webkit-user-select: none;                   /* Запрещает выделение текста везде... */
+  user-select: none;
+  
+  overflow-x: hidden;                          /* Защита от горизонтального скролла */
+  
+  /* Поддержка Safe Area (для iPhone с челкой) */
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Разрешаем выделение текста только там, где оно нужно (инпуты) */
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Фикс для плавности прокрутки на iOS */
+html {
+  -webkit-overflow-scrolling: touch;
+}
+
+body.parent-mode {
+  background-color: rgba(0, 0, 0, 0.2) !important;
+  background-attachment: fixed;
+}
+
+button {
+  transition: transform 0.1s active, opacity 0.2s;
+  cursor: pointer;
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+.glass-card {
+  /* Полупрозрачный белый для светлой темы или черный для темной */
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(10px); /* Размытие фона за карточкой */
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  /* Отключаем параллакс, если у пользователя в системе включен режим экономии энергии/движения */
+  .parallax-bg {
+    transform: none !important;
+  }
+}
+/* --- АНИМАЦИИ --- */
+
+/* 1. Тряска карточки при удержании */
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0) scale(0.95); }
+  25% { transform: translate(-2px, 2px) rotate(-1deg) scale(0.95); }
+  75% { transform: translate(2px, -2px) rotate(1deg) scale(0.95); }
+}
+
+.shaking-intense {
+  animation: shake 0.15s infinite;
+  border-color: var(--accent-orange) !important;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.3);
+}
+
+/* 2. Эффект улетающей карточки после нажатия "Готово" */
+@keyframes flyUp {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: translateY(-500px) scale(0.5) rotate(20deg); opacity: 0; }
+}
+
+.task-approving {
+  animation: shake 0.4s ease-in-out infinite, flyUp 1s forwards 0.5s;
+  pointer-events: none;
+}
+
+/* 3. Монетки */
+@keyframes coinFall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(400px) rotate(720deg); opacity: 0; }
+}
+
+.coin {
+  position: fixed;
+  font-size: 24px;
+  pointer-events: none;
+  z-index: 9999;
+  animation: coinFall 1s ease-in forwards;
+}
+
+/* 4. Кольцо загрузки (Hold) */
+@keyframes borderFill {
+  from { stroke-dashoffset: 302; }
+  to { stroke-dashoffset: 0; }
+}
+
+.loading-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+}
+
+.loading-ring circle {
+  fill: none;
+  stroke: var(--accent-orange);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 302; 
+  stroke-dashoffset: 302;
+  animation: borderFill 5s linear forwards;
+}
+
+/* Вспомогательные */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes pulse-orange {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.pulse-bg {
+  animation: pulse-orange 20s infinite ease-in-out;
+}
