@@ -1,4 +1,4 @@
-import{j as s,r as u}from"./index-Cd8Z4FKj.js";import{a as o,h as H,s as B}from"./Tasks.module-B6vfeooQ.js";const q="/kids-tracker/assets/coin-BsAl7R4M.mp3",W=({task:r,isWaiting:c,isHolding:a,deadlineText:h,waitingLabel:j,onStart:w,onStop:m})=>{const l=(i,x)=>{i.target.closest("button")||(x==="start"?c||w():m())};return s.jsxs("div",{className:`
+import{j as s,r as u}from"./index-BPrzZQ1k.js";import{a as o,h as H,s as B}from"./Tasks.module-B6vfeooQ.js";const q="/kids-tracker/assets/coin-BsAl7R4M.mp3",W=({task:r,isWaiting:c,isHolding:a,deadlineText:h,waitingLabel:j,onStart:w,onStop:m})=>{const l=(i,x)=>{i.target.closest("button")||(x==="start"?c||w():m())};return s.jsxs("div",{className:`
         ${o.taskCard} 
         ${a?"shaking-intense":""} 
         ${c?o.taskWaiting:""}
