@@ -2,57 +2,87 @@
 <html lang="fi">
 <head>
   <meta charset="UTF-8" />
-  <link rel="preload" as="image" href="/kids-tracker/pwa-192x192.png">
-  <link rel="icon" type="image/png" href="/kids-tracker/pwa-192x192.png" />
+  <link rel="icon" type="image/png" href="pwa-192x192.png" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Kids Tracker 2026</title>
-
+  <meta name="description" content="Kids Tracker - система задач и наград для всей семьи">
+  
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="KidsTracker">
-  <link rel="apple-touch-icon" href="/kids-tracker/pwa-192x192.png">
-  <meta name="theme-color" content="#007AFF">
+  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)">
 
-  <style>
-    /* Стильный лоадер прямо здесь, чтобы он работал мгновенно */
-    body { margin: 0; background-color: #1a1a1a; }
-    #loader-container {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      font-family: -apple-system, system-ui, sans-serif;
-    }
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(0, 122, 255, 0.2);
-      border-top: 3px solid #007AFF;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      margin-bottom: 16px;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    .loading-text {
-      color: #007AFF;
-      font-size: 14px;
-      font-weight: 500;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      opacity: 0.8;
-    }
-  </style>
+  <link rel="preconnect" href="https://www.googleapis.com">
+  <link rel="dns-prefetch" href="https://apis.google.com">
+
+  <script>
+    // МГНОВЕННОЕ ОПРЕДЕЛЕНИЕ ТЕМЫ
+    (function() {
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (prefersDark) {
+        document.documentElement.classList.add('dark');
+      }
+    })();
+  </script>
+
+<style>
+  :root {
+    --bg-loader: #f8fafc;
+    --text-loader: #0f172a;
+    --accent: #6366f1;
+  }
+
+  :root.dark {
+    --bg-loader: #0f172a;
+    --text-loader: #f8fafc;
+    --accent: #818cf8;
+  }
+
+  body {
+    margin: 0;
+    /* Используем переменные лоадера, они гарантированно есть! */
+    
+    color: var(--text-loader);
+    font-family: -apple-system, system-ui, sans-serif;
+  }
+
+  #loader-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    inset: 0;
+    background: var(--bg-loader);
+    z-index: 9999;
+  }
+
+  .spinner {
+    width: 42px;
+    height: 42px;
+    border: 3px solid rgba(128, 128, 128, 0.2);
+    border-left-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .loading-text {
+    margin-top: 16px;
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-loader);
+    opacity: 0.8;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </head>
 <body>
   <div id="root">
     <div id="loader-container">
       <div class="spinner"></div>
-      <div class="loading-text">Ladataan</div>
+      <div class="loading-text">Ladataan...</div>
     </div>
   </div>
   <script type="module" src="/src/main.tsx"></script>

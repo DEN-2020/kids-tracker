@@ -3,25 +3,22 @@ import type { TranslationContent } from '../../translations';
 
 interface HeaderProps {
   total: number;
-  lang: 'fi' | 'ru' | 'en'; // Добавили 'en'
+  lang: 'fi' | 'ru' | 'en';
   setLang: (l: 'fi' | 'ru' | 'en') => void;
   t: TranslationContent;
+ 
 }
 
 export const Header = ({ total, lang, setLang, t }: HeaderProps) => {
-  const [isDark, setIsDark] = useState(() => {
-    const hasDarkClass = document.body.classList.contains('dark');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (prefersDark && !hasDarkClass) document.body.classList.add('dark');
-    return hasDarkClass || prefersDark;
-  });
+  // Упрощаем: просто проверяем, есть ли уже класс dark
+  const [isDark, setIsDark] = useState(() => document.body.classList.contains('dark'));
 
   useEffect(() => {
+    // Слушаем системные изменения
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (e: MediaQueryListEvent) => {
-      const shouldBeDark = e.matches;
-      document.body.classList.toggle('dark', shouldBeDark);
-      setIsDark(shouldBeDark);
+      document.body.classList.toggle('dark', e.matches);
+      setIsDark(e.matches);
     };
     mediaQuery.addEventListener('change', handleChange);
     return () => mediaQuery.removeEventListener('change', handleChange);
@@ -45,7 +42,7 @@ export const Header = ({ total, lang, setLang, t }: HeaderProps) => {
     padding: '0 4px'
   });
 
-  return (
+return (
     <header style={{ 
       display: 'flex', 
       justifyContent: 'space-between', 
@@ -61,7 +58,7 @@ export const Header = ({ total, lang, setLang, t }: HeaderProps) => {
       top: '10px',
       zIndex: 100
     }}>
-      {/* Баланс */}
+      {/* Баланс (Слева) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
         <div style={{ 
           background: 'var(--accent-green)', 
@@ -87,7 +84,11 @@ export const Header = ({ total, lang, setLang, t }: HeaderProps) => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+      {/* Правая часть: Выход + Тема + Языки */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        
+
+
         {/* Переключатель темы */}
         <button 
           onClick={toggleTheme}
@@ -101,8 +102,7 @@ export const Header = ({ total, lang, setLang, t }: HeaderProps) => {
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'
+            justifyContent: 'center'
           }}
         >
           {isDark ? '☀️' : '🌙'}
@@ -112,7 +112,7 @@ export const Header = ({ total, lang, setLang, t }: HeaderProps) => {
         <div style={{ width: '1px', height: '20px', backgroundColor: 'var(--border-color)' }} />
 
         {/* Языки */}
-        <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '2px', alignItems: 'center' }}>
           <button onClick={() => setLang('fi')} style={flagStyle(lang === 'fi')}>🇫🇮</button>
           <button onClick={() => setLang('ru')} style={flagStyle(lang === 'ru')}>🇷🇺</button>
           <button onClick={() => setLang('en')} style={flagStyle(lang === 'en')}>🇺🇸</button>

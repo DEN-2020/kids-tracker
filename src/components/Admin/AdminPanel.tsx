@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { db } from '../../firebase';
+import { db } from '../../db';
 import { 
   collection, addDoc, deleteDoc, doc, 
-  setDoc, increment, onSnapshot 
+  updateDoc, onSnapshot, query, where
 } from 'firebase/firestore';
 import type { TranslationContent } from '../../translations';
 
@@ -11,18 +11,24 @@ import { TemplatesList } from './TemplatesList';
 import { AchievementsSettings } from './AchievementsSettings';
 import { ShopSettings } from './ShopSettings';
 import styles from './Admin.module.css';
+import { isRecordedToday } from '../../utils/dayKey';
+import { completeTransaction } from '../../services/database';
+import { clearTasksMutation, upsertTaskMutation } from '../../services/server';
 
 interface UserProfile {
   uid: string;
   name: string;
   avatar: string;
   role: 'child' | 'parent';
+  familyId?: string;
 }
 
 interface AdminPanelProps {
   t: TranslationContent;
   selectedChildId: string;
+  familyId: string;
   mode: 'check' | 'edit' | 'shop' | 'levels';
+  lang: 'fi' | 'ru' | 'en';
 }
 
 interface DbTask {
@@ -36,19 +42,22 @@ interface DbTask {
   isAutoPayout?: boolean;
   assignedTo?: string;
   lastCompleted?: string;
+  lastCompletedAt?: Date | { toDate: () => Date } | string;
+  familyId?: string;
 }
 
 interface ApprovalRequest {
   id: string;
   label: string;
   points: number;
-  taskId: string;
+  taskId?: string;
   status: 'pending' | 'in_progress' | 'completed';
   userId: string;
   icon?: string;
+  familyId?: string;
 }
 
-export const AdminPanel = ({ t, selectedChildId, mode }: AdminPanelProps) => {
+export const AdminPanel = ({ t, selectedChildId, familyId, mode, lang }: AdminPanelProps) => {
   const [tasks, setTasks] = useState<DbTask[]>([]);
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -61,27 +70,36 @@ export const AdminPanel = ({ t, selectedChildId, mode }: AdminPanelProps) => {
   const [autoApprove, setAutoApprove] = useState(false);
   const [autoPayout, setAutoPayout] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const saveTaskErrorByLang = {
+    fi: 'Tehtävän tallennus epäonnistui',
+    ru: 'Не удалось сохранить задачу',
+    en: 'Failed to save task',
+  } as const;
 
   useEffect(() => {
-    const unsubTasks = onSnapshot(collection(db, "tasks_list"), (snap) => {
+    if (!familyId) return;
+
+    const unsubTasks = onSnapshot(query(collection(db, "tasks_list"), where("familyId", "==", familyId)), (snap) => {
       setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() })) as DbTask[]);
     });
-    const unsubApps = onSnapshot(collection(db, "approvals"), (snap) => {
+    const unsubApps = onSnapshot(query(collection(db, "approvals"), where("familyId", "==", familyId)), (snap) => {
       setApprovals(snap.docs.map(d => ({ id: d.id, ...d.data() })) as ApprovalRequest[]);
     });
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+    const unsubUsers = onSnapshot(query(collection(db, "users"), where("familyId", "==", familyId)), (snap) => {
       setUsers(snap.docs.map(d => ({ uid: d.id, ...d.data() })) as UserProfile[]);
     });
     return () => { unsubTasks(); unsubApps(); unsubUsers(); };
-  }, []);
+  }, [familyId]);
 
-  const currentChild = users.find(u => u.uid === selectedChildId);
-  const today = new Date().toISOString().split('T')[0];
+  const scopedTasks = familyId ? tasks : [];
+  const scopedApprovals = familyId ? approvals : [];
+  const scopedUsers = familyId ? users : [];
+  const currentChild = scopedUsers.find(u => u.uid === selectedChildId);
 
-  const childTasks = tasks.filter(t => t.assignedTo === selectedChildId || t.assignedTo === 'all');
+  const childTasks = scopedTasks.filter(t => t.assignedTo === selectedChildId || t.assignedTo === 'all');
   const maxPointsToday = childTasks.reduce((acc, t) => acc + t.points, 0);
   const earnedToday = childTasks
-    .filter(t => t.lastCompleted === today)
+    .filter(t => isRecordedToday(t.lastCompleted, t.lastCompletedAt))
     .reduce((acc, t) => acc + t.points, 0);
   const adminProgressPercent = maxPointsToday > 0 ? Math.round((earnedToday / maxPointsToday) * 100) : 0;
 
@@ -97,60 +115,68 @@ export const AdminPanel = ({ t, selectedChildId, mode }: AdminPanelProps) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleFinalApprove = async (app: ApprovalRequest) => {
-    if (!app.userId) return;
-    try {
-      const userRef = doc(db, "users", app.userId);
-      const isPurchase = app.points < 0;
+const handleFinalApprove = async (app: ApprovalRequest) => {
+  if (!app.userId) return;
 
-      if (isPurchase) {
-        await setDoc(userRef, { currentBalance: increment(app.points) }, { merge: true });
-      } else {
-        await setDoc(userRef, { 
-          totalPoints: increment(app.points),
-          currentBalance: increment(app.points) 
-        }, { merge: true });
-      }
-      
-      await addDoc(collection(db, "history"), {
-        userId: app.userId,
-        label: app.label,
-        points: app.points,
-        date: new Date(),
-        type: isPurchase ? 'spend' : 'earn'
-      });
+  // 1. Оптимистичное обновление: сразу убираем из списка на экране
+  setApprovals(prev => prev.filter(item => item.id !== app.id));
 
-      if (app.taskId) {
-        const originalTask = tasks.find(t => t.id === app.taskId);
-        if (originalTask) {
-          if (originalTask.isAutoRepeat) {
-            await setDoc(doc(db, "tasks_list", originalTask.id), { lastCompleted: today }, { merge: true });
-          } else {
-            await deleteDoc(doc(db, "tasks_list", originalTask.id));
-          }
-        }
-      }
-      await deleteDoc(doc(db, "approvals", app.id));
-    } catch (err) { console.error(err); }
-  };
+  try {
+    await completeTransaction(app.id, app.userId, app.points, app.taskId, {
+      familyId,
+      label: app.label,
+    });
+  } catch (err) { 
+    console.error("Ошибка при одобрении:", err); 
+    // В случае ошибки можно перезагрузить данные из базы, чтобы запрос вернулся в список
+  }
+};
 
-  const addTask = async (e: React.FormEvent) => {
+const addTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newLabel || !selectedChildId) return;
+    if (!newLabel || !selectedChildId || !familyId) return;
+
+    // Подготавливаем данные
     const taskData = { 
-      label: newLabel, points: Number(newPoints), icon: newIcon,
+      label: newLabel, 
+      points: Number(newPoints), 
+      icon: newIcon,
       duration: newDuration > 0 ? Number(newDuration) : null,
-      isAutoRepeat: autoRepeat, isAutoApprove: autoApprove,
-      isAutoPayout: autoPayout, assignedTo: selectedChildId 
+      isAutoRepeat: autoRepeat, 
+      isAutoApprove: autoApprove,
+      isAutoPayout: autoPayout, 
+      assignedTo: selectedChildId,
+      familyId,
     };
-    if (editingId) {
-      await setDoc(doc(db, "tasks_list", editingId), taskData, { merge: true });
+
+    try {
+      await upsertTaskMutation(
+        { taskId: editingId, task: taskData },
+        async () => {
+          if (editingId) {
+            await updateDoc(doc(db, "tasks_list", editingId), taskData);
+            return;
+          }
+
+          await addDoc(collection(db, "tasks_list"), taskData);
+        },
+      );
+
       setEditingId(null);
-    } else {
-      await addDoc(collection(db, "tasks_list"), taskData);
+
+      // СБРОС ФОРМЫ (Очищаем поля после успешного сохранения)
+      setNewLabel(''); 
+      setNewPoints(10); 
+      setNewIcon('📝'); 
+      setNewDuration(0);
+      setAutoRepeat(false); 
+      setAutoApprove(false); 
+      setAutoPayout(false);
+
+    } catch (error) {
+      console.error("Ошибка при сохранении задачи:", error);
+      alert(saveTaskErrorByLang[lang]);
     }
-    setNewLabel(''); setNewPoints(10); setNewIcon('📝'); setNewDuration(0);
-    setAutoRepeat(false); setAutoApprove(false); setAutoPayout(false);
   };
 
   const clearOldTasks = async () => {
@@ -159,7 +185,10 @@ export const AdminPanel = ({ t, selectedChildId, mode }: AdminPanelProps) => {
       (t.assignedTo === selectedChildId || t.assignedTo === 'all') && !t.isAutoRepeat
     );
     try {
-      await Promise.all(tasksToDelete.map(task => deleteDoc(doc(db, "tasks_list", task.id))));
+      await clearTasksMutation(
+        { selectedChildId },
+        async () => Promise.all(tasksToDelete.map(task => deleteDoc(doc(db, "tasks_list", task.id)))),
+      );
     } catch (err) { console.error(err); }
   };
 
@@ -190,12 +219,12 @@ return (
             <h3 style={{ color: 'var(--accent-orange)', fontSize: '18px', marginBottom: '15px' }}>
               🔔 {t.admin.requests} ({currentChild?.name || '...'}) {/* ИСПРАВЛЕНО */}
             </h3>
-            {approvals.filter(a => a.userId === selectedChildId).length === 0 ? (
+            {scopedApprovals.filter(a => a.userId === selectedChildId).length === 0 ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.02)', borderRadius: '24px', border: '1px dashed var(--border-color)' }}>
                 ☕ {t.admin.noRequests} {/* ИСПРАВЛЕНО */}
               </div>
             ) : (
-              approvals.filter(a => a.userId === selectedChildId).map(a => (
+              scopedApprovals.filter(a => a.userId === selectedChildId).map(a => (
                 <div key={a.id} className={styles.requestItem}>
                   <div>
                     <div style={{ fontWeight: 'bold' }}>{a.icon} {a.label}</div>
@@ -229,20 +258,20 @@ return (
             <h4 style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '15px' }}>
               📜 {t.admin.templates}: {/* ИСПРАВЛЕНО */}
             </h4>
-            <TemplatesList t={t} tasks={tasks} users={users} selectedChildId={selectedChildId} copyToForm={copyToForm} />
+            <TemplatesList t={t} tasks={scopedTasks} users={scopedUsers} selectedChildId={selectedChildId} copyToForm={copyToForm} />
           </div>
         </div>
       )}
 
       {mode === 'shop' && (
         <div className={styles.leftCol}>
-          <ShopSettings t={t} />
+          <ShopSettings t={t} familyId={familyId} />
         </div>
       )}
 
       {mode === 'levels' && (
         <div className={styles.leftCol}>
-          <AchievementsSettings t={t} />
+          <AchievementsSettings t={t} familyId={familyId} />
         </div>
       )}
     </div>

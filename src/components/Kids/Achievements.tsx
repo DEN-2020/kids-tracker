@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { db } from '../../firebase';
-import { collection, onSnapshot, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../../db';
+import { collection, onSnapshot, doc, updateDoc, arrayUnion, query, where } from 'firebase/firestore';
 import styles from './Tasks.module.css'; 
 import holdSoundFile from '../../assets/hold.mp3';
 import successSoundFile from '../../assets/success.mp3';
 import type { TranslationContent } from '../../translations';
+import { activateAchievementMutation } from '../../services/server';
 
 interface AchievementItem {
   id: string;
@@ -12,6 +13,7 @@ interface AchievementItem {
   icon: string;
   label: string; // Основное и единственное поле для названия
   type: 'title';
+  familyId?: string;
   bonus?: string;
 }
 
@@ -19,9 +21,10 @@ interface AchievementsProps {
   t: TranslationContent;
   totalPoints: number;
   userId: string;
+  familyId: string;
 }
 
-export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, userId }) => {
+export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, userId, familyId }) => {
   const [items, setItems] = useState<AchievementItem[]>([]);
   const [activatedIds, setActivatedIds] = useState<string[]>([]);
   const [holdId, setHoldId] = useState<string | null>(null);
@@ -29,17 +32,23 @@ export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, user
   const timerRef = useRef<number | null>(null);
   const holdSound = useRef(new Audio(holdSoundFile)).current;
   const successSound = useRef(new Audio(successSoundFile)).current;
+  const visibleItems = userId && familyId ? items : [];
+  const visibleActivatedIds = userId ? activatedIds : [];
 
   useEffect(() => {
-    if (!userId || userId.trim() === "") return;
+    if (!userId || userId.trim() === "" || !familyId) return;
 
-    const unsubItems = onSnapshot(collection(db, "achievements_list"), (snap) => {
-      const data = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as AchievementItem))
-        .filter(item => item.type === 'title')
-        .sort((a, b) => a.threshold - b.threshold);
-      setItems(data);
-    });
+    const unsubItems = onSnapshot(
+      query(collection(db, "achievements_list"), where("familyId", "==", familyId)),
+      (snap) => {
+        const nextItems = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() } as AchievementItem))
+          .filter((item) => item.type === 'title')
+          .sort((a, b) => a.threshold - b.threshold);
+        setItems(nextItems);
+      },
+      (err) => console.error("Achievements query error:", err),
+    );
 
     const userRef = doc(db, "users", userId);
     const unsubUser = onSnapshot(userRef, (snap) => {
@@ -49,10 +58,10 @@ export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, user
     });
 
     return () => { unsubItems(); unsubUser(); };
-  }, [userId]);
+  }, [familyId, userId]);
 
   const handleStartHold = (item: AchievementItem) => {
-    if (totalPoints < item.threshold || activatedIds.includes(item.id)) return;
+    if (totalPoints < item.threshold || visibleActivatedIds.includes(item.id)) return;
 
     setHoldId(item.id);
     holdSound.currentTime = 0;
@@ -65,9 +74,12 @@ export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, user
       successSound.play().catch(() => {});
       
       const userRef = doc(db, "users", userId);
-      await updateDoc(userRef, {
+      await activateAchievementMutation({
+        achievementId: item.id,
+        userId,
+      }, async () => updateDoc(userRef, {
         activatedAchievements: arrayUnion(item.id)
-      });
+      }));
 
       setHoldId(null);
     }, 5000);
@@ -88,9 +100,9 @@ export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, user
       </h3>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-        {items.map((item) => {
+        {visibleItems.map((item) => {
           const isReached = totalPoints >= item.threshold;
-          const isActivated = activatedIds.includes(item.id);
+          const isActivated = visibleActivatedIds.includes(item.id);
           const isHolding = holdId === item.id;
           const progress = Math.min((totalPoints / item.threshold) * 100, 100);
 

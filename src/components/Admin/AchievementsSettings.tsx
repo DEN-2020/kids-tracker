@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { db } from '../../firebase';
-import { collection, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../db';
+import { collection, onSnapshot, setDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
 import styles from './Admin.module.css';
 import type { TranslationContent } from '../../translations';
+import { deleteCatalogItemMutation, upsertCatalogItemMutation } from '../../services/server';
 
 interface Achievement {
   id: string;
@@ -11,13 +12,14 @@ interface Achievement {
   label: string; // Одно название для всех
   type: 'title';
   bonus?: string;
+  familyId?: string;
 }
 
 const QUICK_ICONS = ['🏆', '💎', '⭐', '🥇', '🥈', '🥉', '🚀', '👑', '🧙', '🦸', '👾', '🌟'];
 
-export const AchievementsSettings = ({ t }: { t: TranslationContent }) => {
+export const AchievementsSettings = ({ t, familyId }: { t: TranslationContent; familyId: string }) => {
   const [items, setItems] = useState<Achievement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedFamilyId, setLoadedFamilyId] = useState('');
 
   // Состояние формы
   const [label, setLabel] = useState('');
@@ -26,9 +28,13 @@ export const AchievementsSettings = ({ t }: { t: TranslationContent }) => {
   const [icon, setIcon] = useState('🏆');
 
   const adm = t.admin || {};
+  const loading = !!familyId && loadedFamilyId !== familyId;
+  const visibleItems = familyId && loadedFamilyId === familyId ? items : [];
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "achievements_list"), (snap) => {
+    if (!familyId) return;
+
+    const unsub = onSnapshot(query(collection(db, "achievements_list"), where("familyId", "==", familyId)), (snap) => {
       const data = snap.docs
         .map(d => {
           const itemData = d.data();
@@ -41,23 +47,37 @@ export const AchievementsSettings = ({ t }: { t: TranslationContent }) => {
         })
         .filter(item => item.type === 'title');
       setItems(data.sort((a, b) => a.threshold - b.threshold));
-      setLoading(false);
+      setLoadedFamilyId(familyId);
     });
     return unsub;
-  }, []);
+  }, [familyId]);
 
   const saveItem = async () => {
-    if (!label) return;
+    if (!label || !familyId) return;
     const id = `title_${Date.now()}`;
-    await setDoc(doc(db, "achievements_list", id), {
+    const itemData = {
       threshold,
       icon,
       label, 
       bonus,
-      type: 'title'
-    });
+      familyId,
+      type: 'title' as const,
+    };
+
+    await upsertCatalogItemMutation(
+      { itemId: id, item: itemData },
+      async () => setDoc(doc(db, "achievements_list", id), itemData),
+    );
     setLabel('');
     setBonus('');
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    if (!window.confirm(t.familySettings.deleteConfirm)) return;
+    await deleteCatalogItemMutation(
+      { itemId },
+      async () => deleteDoc(doc(db, "achievements_list", itemId)),
+    );
   };
 
   if (loading) return <div className={styles.spinner}>⌛</div>;
@@ -121,7 +141,7 @@ export const AchievementsSettings = ({ t }: { t: TranslationContent }) => {
 
       {/* СПИСОК УРОВНЕЙ */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <div key={item.id} className={styles.templateItem} style={{ borderLeft: '4px solid var(--accent-orange)' }}>
             <div className={styles.templateInfo}>
               <span style={{ fontSize: '28px' }}>{item.icon}</span>
@@ -138,7 +158,7 @@ export const AchievementsSettings = ({ t }: { t: TranslationContent }) => {
               </div>
             </div>
             <button 
-              onClick={() => window.confirm(t.familySettings.deleteConfirm) && deleteDoc(doc(db, "achievements_list", item.id))} 
+              onClick={() => handleDeleteItem(item.id)} 
               className={styles.deleteBtn}
             >
               &times;

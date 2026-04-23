@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { db, auth } from '../../firebase';
+import { FirebaseError } from 'firebase/app';
+import { auth } from '../../firebase'; import { db } from '../../db';
 import { 
   collection, doc, setDoc, updateDoc, 
   deleteDoc, onSnapshot, query, where 
@@ -7,7 +8,11 @@ import {
 import { QRCodeSVG } from 'qrcode.react'; 
 import type { TranslationContent } from '../../translations';
 import { PrivacyPolicy } from '../Legal/PrivacyPolicy';
-import { Instructions } from '../Legal/Instructions'; // Добавляем импорт
+import { Instructions } from '../Legal/Instructions';
+import {
+  deleteFamilyMemberMutation,
+  upsertFamilyMemberMutation,
+} from '../../services/server';
 
 interface Member {
   id: string;
@@ -25,21 +30,26 @@ interface UserProfile {
   familyId: string;
 }
 
+const AVATAR_OPTIONS = ['👶', '🧒', '👦', '👧', '🦁', '🦊', '🦄', '🤖', '🧔', '👩', '👨', '👵', '👴', '🐱', '🐶', '🐯', '🐼'];
+
 export const FamilySettings = ({ familyId, t, profile, lang, handleLogout }: { 
   familyId: string; 
   t: TranslationContent; 
   profile: UserProfile; 
   lang: string;
-  handleLogout: () => void;
+  handleLogout: () => Promise<void> | void;
 }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [name, setName] = useState('');
   const [role, setRole] = useState<'child' | 'parent'>('child');
   const [avatar, setAvatar] = useState('👶');
   const [editId, setEditId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editAvatar, setEditAvatar] = useState('');
   const [copied, setCopied] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(false); // Состояние для инструкции
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const joinLink = `${window.location.origin}${window.location.pathname}?join=${familyId}`;
 
@@ -50,65 +60,140 @@ export const FamilySettings = ({ familyId, t, profile, lang, handleLogout }: {
     });
   }, [familyId]);
 
+  const AvatarDisplay = ({ src, size = 40 }: { src: string, size?: number }) => (
+    <div style={{ 
+      width: `${size}px`, height: `${size}px`, borderRadius: '50%', 
+      overflow: 'hidden', display: 'flex', alignItems: 'center', 
+      justifyContent: 'center', background: 'var(--bg-color)', border: '1px solid var(--border-color)',
+      fontSize: `${size * 0.6}px`, flexShrink: 0
+    }}>
+      {src?.startsWith('http') ? (
+        <img src={src} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        src || '👤'
+      )}
+    </div>
+  );
+
   const handleCopy = () => {
     navigator.clipboard.writeText(familyId);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: t.familySettings.inviteTitle,
-          text: `${t.familySettings.inviteTitle}: ${familyId}`,
-          url: joinLink,
-        });
-      } catch (err) { console.log(err); }
-    } else {
-      handleCopy();
+  const getDeleteAccountMessage = (type: 'missing-session' | 'reauth-required' | 'failed' | 'deleting') => {
+    if (lang === 'fi') {
+      if (type === 'missing-session') return 'Aktiivista käyttäjäistuntoa ei löytynyt. Kirjaudu ulos ja sisään uudelleen.';
+      if (type === 'reauth-required') return 'Tilin poistaminen vaatii uuden kirjautumisen. Kirjaudu ulos, kirjaudu takaisin sisään ja yritä uudelleen.';
+      if (type === 'deleting') return 'Poistetaan...';
+      return 'Tilin poistaminen epäonnistui. Yritä uudelleen.';
     }
+
+    if (lang === 'ru') {
+      if (type === 'missing-session') return 'Не удалось подтвердить активную сессию. Выйдите и войдите снова.';
+      if (type === 'reauth-required') return 'Для удаления аккаунта нужно заново подтвердить вход. Выйдите, войдите снова и повторите попытку.';
+      if (type === 'deleting') return 'Удаление...';
+      return 'Не удалось удалить аккаунт. Попробуйте ещё раз.';
+    }
+
+    if (type === 'missing-session') return 'Could not confirm the active session. Please sign out and sign in again.';
+    if (type === 'reauth-required') return 'Deleting the account requires a fresh sign-in. Please sign out, sign back in, and try again.';
+    if (type === 'deleting') return 'Deleting...';
+    return 'Could not delete the account. Please try again.';
   };
 
   const deleteMyAccount = async () => {
-    if (window.confirm(t.familySettings.deleteConfirm)) {
+    if (isDeletingAccount || !window.confirm(t.familySettings.deleteConfirm)) {
+      return;
+    }
+
+    const currentUser = auth.currentUser;
+    if (!currentUser || currentUser.uid !== profile.uid) {
+      alert(getDeleteAccountMessage('missing-session'));
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      await currentUser.delete();
+
       try {
         await deleteDoc(doc(db, "users", profile.uid));
-        await auth.currentUser?.delete(); 
-        handleLogout();
-      } catch (err) {
-        console.error("Delete account error:", err);
-        handleLogout(); 
+      } catch (cleanupError) {
+        console.error("Delete profile cleanup error:", cleanupError);
       }
+
+      await Promise.resolve(handleLogout()).catch((logoutError) => {
+        console.error("Post-delete logout error:", logoutError);
+      });
+    } catch (err) {
+      console.error("Delete account error:", err);
+      if (err instanceof FirebaseError && err.code === 'auth/requires-recent-login') {
+        alert(getDeleteAccountMessage('reauth-required'));
+        return;
+      }
+
+      alert(getDeleteAccountMessage('failed'));
+    } finally {
+      setIsDeletingAccount(false);
     }
   };
 
   const addMember = async () => {
     if (!name.trim()) return;
-    const customId = `${role}_${name.toLowerCase().trim().replace(/\s+/g, '_')}`;
+    const customId = `${role}_${Date.now()}`;
     try {
-      await setDoc(doc(db, "users", customId), {
-        name: name.trim(),
-        role,
-        avatar,
-        familyId,
-        totalPoints: 0,
-        currentBalance: 0
-      });
+      await upsertFamilyMemberMutation(
+        {
+          avatar,
+          name: name.trim(),
+          role,
+        },
+        async () => {
+          await setDoc(doc(db, "users", customId), {
+            name: name.trim(),
+            role,
+            avatar,
+            familyId,
+            totalPoints: 0,
+            currentBalance: 0
+          });
+        },
+      );
       setName('');
+      setAvatar('👶');
     } catch (err) { console.error(err); }
   };
 
-  const updateMember = async (id: string, newName: string, newAvatar: string) => {
+  const startEdit = (m: Member) => {
+    setEditId(m.id);
+    setEditName(m.name);
+    setEditAvatar(m.avatar);
+  };
+
+  const saveEdit = async (id: string) => {
     try {
-      await updateDoc(doc(db, "users", id), { name: newName, avatar: newAvatar });
+      const member = members.find((entry) => entry.id === id);
+      await upsertFamilyMemberMutation(
+        {
+          avatar: editAvatar,
+          memberId: id,
+          name: editName,
+          role: member?.role === 'parent' ? 'parent' : 'child',
+        },
+        async () => updateDoc(doc(db, "users", id), { name: editName, avatar: editAvatar }),
+      );
       setEditId(null);
     } catch (err) { console.error(err); }
   };
 
   const deleteMember = async (id: string) => {
+    if (id === profile.uid) return;
     if (window.confirm(t.familySettings.deleteConfirm)) {
-      await deleteDoc(doc(db, "users", id));
+      await deleteFamilyMemberMutation(
+        { memberId: id },
+        async () => deleteDoc(doc(db, "users", id)),
+      );
     }
   };
 
@@ -118,115 +203,120 @@ export const FamilySettings = ({ familyId, t, profile, lang, handleLogout }: {
       {/* ПРИГЛАШЕНИЕ */}
       <div style={{ padding: '24px', background: 'var(--card-bg)', borderRadius: '24px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
         <h3 style={{ marginBottom: '15px' }}>📢 {t.familySettings.inviteTitle}</h3>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '15px' }}>{t.familySettings.inviteDesc}</p>
         <div style={{ background: 'white', padding: '12px', display: 'inline-block', borderRadius: '16px', marginBottom: '15px' }}>
           <QRCodeSVG value={joinLink} size={150} />
         </div>
         <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
           <button onClick={handleCopy} style={inviteBtnStyle}>
-            {copied ? `✅ ${t.familySettings.copied}` : `📋 ${t.familySettings.copyCode}: ${familyId}`}
+            {copied ? `✅` : `📋 ${familyId}`}
           </button>
-          <button onClick={handleShare} style={{ ...inviteBtnStyle, background: 'var(--accent-green)' }}>
+          <button 
+            onClick={() => navigator.share?.({ title: 'Kids Tracker', url: joinLink })} 
+            style={{ ...inviteBtnStyle, background: 'var(--accent-green)' }}
+          >
             🔗 {t.familySettings.shareLink}
           </button>
         </div>
       </div>
 
       <div style={{ padding: '20px', background: 'var(--card-bg)', borderRadius: '24px', border: '1px solid var(--border-color)' }}>
-        <h3 style={{ marginBottom: '15px' }}>👨‍👩‍👧‍👦 {t.familySettings.title}</h3>
+        <h3 style={{ marginBottom: '20px' }}>👨‍👩‍👧‍👦 {t.familySettings.title}</h3>
         
         {/* Список участников */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
           {members.map(m => (
-            <div key={m.id} style={memberCardStyle}>
-              {editId === m.id ? (
-                <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-                  <input 
-                    autoFocus
-                    defaultValue={m.name} 
-                    onBlur={(e) => updateMember(m.id, e.target.value, m.avatar)}
-                    onKeyDown={(e) => e.key === 'Enter' && updateMember(m.id, e.currentTarget.value, m.avatar)}
-                    style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid var(--accent-blue)' }} 
-                  />
-                  <button onClick={() => setEditId(null)}>❌</button>
-                </div>
-              ) : (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ fontSize: '24px' }}>{m.avatar}</span>
-                    <div>
-                      <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{m.name} {m.role === 'parent' ? '👤' : '⭐️'}</div>
-                      <div style={{ fontSize: '11px', opacity: 0.6 }}>
-                        {m.role === 'child' ? `${t.familySettings.pointsBalance}: ${m.totalPoints || 0}` : t.familySettings.adminStatus}
-                      </div>
+            <div key={m.id} style={{ ...memberCardStyle, border: editId === m.id ? '1px solid var(--accent-blue)' : memberCardStyle.border }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1 }}>
+                <AvatarDisplay src={editId === m.id ? editAvatar : m.avatar} />
+                
+                {editId === m.id ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1 }}>
+                    <input 
+                      value={editName} 
+                      onChange={(e) => setEditName(e.target.value)}
+                      style={{ background: 'var(--bg-color)', border: '1px solid #444', borderRadius: '8px', padding: '4px 8px', color: 'white' }}
+                    />
+                    <div style={{ display: 'flex', gap: '5px', overflowX: 'auto', padding: '5px 0' }}>
+                      {AVATAR_OPTIONS.slice(0, 10).map(emoji => (
+                        <span key={emoji} onClick={() => setEditAvatar(emoji)} style={{ cursor: 'pointer', fontSize: '18px', opacity: editAvatar === emoji ? 1 : 0.4 }}>{emoji}</span>
+                      ))}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={() => setEditId(m.id)} style={iconBtn}>✏️</button>
-                    <button onClick={() => deleteMember(m.id)} style={{ ...iconBtn, color: '#ff4d4d' }}>🗑️</button>
+                ) : (
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '15px', color: 'white' }}>{m.name}</div>
+                    <div style={{ fontSize: '12px', opacity: 0.6 }}>{m.role === 'child' ? `💰 ${m.totalPoints || 0}` : t.familySettings.adminStatus}</div>
                   </div>
-                </>
-              )}
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '5px' }}>
+                {editId === m.id ? (
+                  <button onClick={() => saveEdit(m.id)} style={{ ...iconBtn, color: 'var(--accent-green)' }}>✅</button>
+                ) : (
+                  <button onClick={() => startEdit(m)} style={iconBtn}>✏️</button>
+                )}
+                <button 
+                  onClick={() => deleteMember(m.id)} 
+                  style={{ ...iconBtn, color: '#ff4d4d', opacity: m.id === profile.uid ? 0.2 : 1 }}
+                  disabled={m.id === profile.uid}
+                >🗑️</button>
+              </div>
             </div>
           ))}
         </div>
 
         {/* Форма добавления */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '20px 0', borderTop: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px 0', borderTop: '1px solid var(--border-color)' }}>
           <input value={name} onChange={e => setName(e.target.value)} placeholder={t.familySettings.namePlaceholder} style={inputStyle} />
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', padding: '5px' }}>
+            {AVATAR_OPTIONS.map(emoji => (
+              <button key={emoji} onClick={() => setAvatar(emoji)} style={{ fontSize: '22px', background: avatar === emoji ? 'var(--accent-blue)' : 'transparent', border: '1px solid #444', borderRadius: '12px', padding: '6px', cursor: 'pointer' }}>{emoji}</button>
+            ))}
+          </div>
           <div style={{ display: 'flex', gap: '10px' }}>
-            <select 
-              value={role} 
-              onChange={e => {
-                  const r = e.target.value as 'child' | 'parent';
-                  setRole(r);
-                  setAvatar(r === 'child' ? '👶' : '🧔');
-              }} 
-              style={{ ...inputStyle, flex: 1 }}
-            >
+            <select value={role} onChange={e => setRole(e.target.value as 'child' | 'parent')} style={{ ...inputStyle, flex: 1 }}>
               <option value="child">{t.profile.child}</option>
               <option value="parent">{t.profile.parent}</option>
             </select>
-            <input value={avatar} onChange={e => setAvatar(e.target.value)} style={{ ...inputStyle, width: '60px', textAlign: 'center' }} />
+            <button onClick={addMember} style={{ ...addBtnStyle, flex: 1 }}>{t.familySettings.addManual}</button>
           </div>
-          <button onClick={addMember} style={addBtnStyle}>{t.familySettings.addManual}</button>
         </div>
 
-        {/* Нижняя панель с кнопками помощи и удаления */}
+        {/* Секция помощи и удаления (ИСПОЛЬЗУЕМ ВСЕ ПЕРЕМЕННЫЕ) */}
         <div style={{ marginTop: '30px', paddingTop: '20px', borderTop: '1px dashed var(--border-color)', textAlign: 'center' }}>
-           <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '15px' }}>
-             <button 
-               onClick={() => setShowPrivacy(true)} 
-               style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
-             >
-               Privacy Policy / Tietosuoja
-             </button>
-             <button 
-               onClick={() => setShowInstructions(true)} 
-               style={{ background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}
-             >
-               ❓ {lang === 'fi' ? 'Ohjeet' : lang === 'ru' ? 'Инструкция' : 'Help'}
-             </button>
-           </div>
-           
-           <button 
-             onClick={deleteMyAccount}
-             style={{ background: 'none', border: '1px solid #ff4d4d', color: '#ff4d4d', padding: '8px 15px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer' }}
-           >
-             {lang === 'fi' ? 'Poista tilini' : 'Удалить мой аккаунт'}
-           </button>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '15px' }}>
+            <button onClick={() => setShowPrivacy(true)} style={helpBtnStyle}>Privacy Policy</button>
+            <button onClick={() => setShowInstructions(true)} style={helpBtnStyle}>
+              ❓ {lang === 'fi' ? 'Ohjeet' : lang === 'ru' ? 'Инструкция' : 'Help'}
+            </button>
+          </div>
+          <button
+            onClick={deleteMyAccount}
+            style={{ ...deleteAccBtnStyle, opacity: isDeletingAccount ? 0.7 : 1, cursor: isDeletingAccount ? 'wait' : 'pointer' }}
+            disabled={isDeletingAccount}
+          >
+            {isDeletingAccount
+              ? getDeleteAccountMessage('deleting')
+              : lang === 'fi'
+                ? 'Poista tilini'
+                : lang === 'en'
+                  ? 'Delete my account'
+                  : 'Удалить мой аккаунт'}
+          </button>
         </div>
       </div>
 
-      {/* Модальные окна */}
       {showPrivacy && <PrivacyPolicy lang={lang} onClose={() => setShowPrivacy(false)} />}
       {showInstructions && <Instructions t={t} lang={lang} onClose={() => setShowInstructions(false)} />}
     </div>
   );
 };
 
-const inputStyle = { padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'var(--text-main)' };
-const addBtnStyle = { padding: '12px', background: 'var(--accent-green)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold' as const, cursor: 'pointer' };
-const inviteBtnStyle = { padding: '10px 15px', borderRadius: '12px', border: 'none', background: 'var(--accent-blue)', color: 'white', fontWeight: 'bold' as const, cursor: 'pointer', fontSize: '14px' };
-const memberCardStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-color)', borderRadius: '16px' };
-const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' };
+const inviteBtnStyle = { padding: '10px 18px', borderRadius: '15px', border: 'none', background: 'var(--accent-blue)', color: 'white', fontWeight: 'bold' as const, cursor: 'pointer' };
+const inputStyle = { padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', color: 'white' };
+const addBtnStyle = { background: 'var(--accent-green)', color: 'white', border: 'none', borderRadius: '12px', fontWeight: 'bold' as const, cursor: 'pointer' };
+const memberCardStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' };
+const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', padding: '5px' };
+const helpBtnStyle = { background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' };
+const deleteAccBtnStyle = { background: 'none', border: '1px solid #ff4d4d', color: '#ff4d4d', padding: '8px 15px', borderRadius: '10px', fontSize: '12px', cursor: 'pointer' };

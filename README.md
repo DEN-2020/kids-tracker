@@ -1,73 +1,103 @@
-# React + TypeScript + Vite
+# Kids Tracker 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+**A Gamified Motivation & Task Management System for Modern Families**
 
-Currently, two official plugins are available:
+Kids Tracker is a web application designed to turn daily chores into an engaging adventure. By completing tasks, children earn points that they can trade for real-world rewards or money through a controlled shop environment.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## React Compiler
+## 🛠 Tech Stack
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+- **Frontend:** React 18 with Vite
+- **Language:** TypeScript (Strict Mode)
+- **Backend:** Firebase (Firestore NoSQL, Auth, Storage)
+- **State Management:** React Hooks (useState, useEffect, useCallback)
+- **Real-time:** Firestore OnSnapshot for instant data syncing
+- **Audio API:** HTML5 Audio for interactive feedback
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 🌟 Key Features
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### 👦 Kid's Experience
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **Task Management:** View assigned tasks with icons, points, and durations.
+- **Hold-to-Confirm:** A unique 5-second hold mechanic to prevent accidental completions, featuring a visual progress bar and audio cues.
+- **Task Timers:** Built-in countdown timers for time-sensitive chores.
+- **Personal Shop:** Exchange balance for custom rewards or convert points to currency (Euro).
+- **Profile Customization:** Upload and change avatars directly from the app (stored in Firebase Storage).
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+### 🧔 Parent's Control (Admin Panel)
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+- **Multi-Child Support:** Seamlessly switch between family members to track individual progress.
+- **Parental Override:** Instant task approval or shop purchases via a confirmation bypass for parents.
+- **Family Linking:** Automatic family joining via unique invite links (`?join=CODE`).
+- **Comprehensive Admin Tools:**
+  - Create/Edit tasks with auto-repeat and auto-approve options.
+  - Manage shop items and point-to-euro exchange rates.
+  - Track activity history and approve pending requests.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## 📂 Project Structure
+
+src/
+├── assets/ # MP3 files and global images
+├── components/
+│ ├── Admin/ # AdminPanel, FamilySettings, ShopSettings
+│ ├── Auth/ # RegisterPage, ProfileSelector
+│ ├── Kids/ # TaskList, Shop, Achievements
+│ └── Layout/ # Header, Navbar, Footer
+├── firebase.ts # Firebase initialization & configuration
+├── translations.ts # Multi-language support (FI, RU, EN)
+└── App.tsx # Global state, Auth observer, and core logic
+
+---
+
+## 📂 Database Schema (Firestore)
+
+- **users**: `{ uid, name, role, avatar (URL), familyId, currentBalance, totalPoints }`
+- **tasks_list**: `{ label, points, icon, assignedTo, isAutoRepeat, isAutoApprove }`
+- **approvals**: `{ userId, taskId, label, points, status ('pending'|'in_progress') }`
+- **achievements_list**: `{ label, threshold, icon, type, valueInEuro }`
+- **history**: Log of all completed earning and spending events.
+
+---
+
+## 🚀 Installation & Setup
+
+1. **Install Dependencies:**
+   npm install
+
+2. **Configure Firebase:**
+   Copy `.env.example` to `.env.local` and fill in real values:
+   VITE_FIREBASE_API_KEY=your_key
+   VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your_project_id
+   VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+   VITE_FIREBASE_APP_ID=your_app_id
+   VITE_USE_FIREBASE_FUNCTIONS=false
+
+3. **Run Development Mode:**
+   npm run dev
+
+4. **Backfill legacy Firestore data (optional but recommended before strict tenant rollout):**
+   - Dry run: `npm run migrate:familyid:dry`
+   - Apply: `npm run migrate:familyid:apply`
+   - Detailed rollout notes: `docs/family-rollout-and-migration.md`
+
+## ⚙️ GitHub / Firebase Setup
+
+- Add `FIREBASE_SERVICE_ACCOUNT_JSON` to GitHub Secrets for Firebase auth.
+- Set `FIREBASE_PROJECT_ID` as a repository variable in GitHub.
+- Add these repository variables too for deploy builds: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID`, and optionally `VITE_FIREBASE_MEASUREMENT_ID`.
+- `Verify` in GitHub uses safe placeholder Vite env values, so real frontend Firebase keys are not required just for CI build checks.
+- The deploy workflow is manual only; it does not run on every `push` to `main`.
+- Use the `deploy_functions` input only when Cloud Functions should be deployed too.
+- Before enabling server-side mutations in production, deploy functions and then set `VITE_USE_FIREBASE_FUNCTIONS=true` in the environment that builds your frontend.
+- For local Functions work, install their dependencies once in `functions/` with `npm install`.
+
+---
+
+_Developed as a modern tool for family productivity and positive reinforcement._

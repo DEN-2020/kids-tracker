@@ -17,7 +17,7 @@
   --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-body.dark {
+:root.dark body, body.dark {
   /* Темная тема: "Deep Space" */
   --bg-color: #0f172a;
   --card-bg: #1e293b;
@@ -69,7 +69,7 @@ html {
 }
 
 body.parent-mode {
-  background: var(--parent-gradient) !important;
+  background-color: rgba(0, 0, 0, 0.2) !important;
   background-attachment: fixed;
 }
 
@@ -82,6 +82,22 @@ button:active {
   transform: scale(0.96);
 }
 
+.glass-card {
+  /* Полупрозрачный белый для светлой темы или черный для темной */
+  background: var(--nav-bg);
+  backdrop-filter: none; /* Размытие фона за карточкой */
+  -webkit-backdrop-filter: none;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  /* Отключаем параллакс, если у пользователя в системе включен режим экономии энергии/движения */
+  .parallax-bg {
+    transform: none !important;
+  }
+}
 /* --- АНИМАЦИИ --- */
 
 /* 1. Тряска карточки при удержании */

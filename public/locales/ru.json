@@ -1,0 +1,147 @@
+{
+  "daily": "Дневной баланс",
+  "saved": "В копилке",
+  "points": "баллов",
+  "buy": "Использовать бонусное время",
+  "noPoints": "Недостаточно баллов!",
+  "granted": "Доступ открыт!",
+  "tasksTitle": "Задания",
+  "statsTitle": "Статистика",
+  "inProgress": "В процессе:",
+  "availableTasks": "Доступные задания:",
+  "done": "ГОТОВО ✅",
+  "logout": "Выйти",
+  "approve": "Разрешить начать ▶️",
+  "givePoints": "Дать баллы ✅",
+  "executing": "Выполняется...",
+  "noRequests": "Запросов пока нет",
+  "taskSettings": "Настройка заданий",
+  "taskName": "Название задачи",
+  "averagePerDay": "Среднее в день",
+  "perWeek": "За неделю",
+  "noData": "Нет данных",
+  "achievementsTab": "Уровни",
+  "shopTab": "Магазин",
+  "loading": "Загрузка...",
+  "achievements": {
+    "title": "Твои достижения",
+    "nextLevel": "Следующий уровень:",
+    "needed": "Нужно:",
+    "xp": "XP",
+    "bonus": "Твой бонус"
+  },
+  "shop": {
+    "title": "Магазин бонусов",
+    "buyButton": "Купить",
+    "exchange": "Обмен",
+    "buyPrefix": "Куплено"
+  },
+  "tasks": {
+    "laksyt": "Домашнее задание",
+    "jumppa": "Зарядка",
+    "ulkoilu": "Прогулка",
+    "kissat": "Покормить кошек",
+    "kotityot": "Помощь по дому",
+    "kaytos": "Хорошее поведение"
+  },
+  "admin": {
+    "checkTasks": "Проверка",
+    "editTasks": "Шаблоны",
+    "settings": "Семья",
+    "shopSettingsTitle": "Настройка Магазина",
+    "typeReward": "Товар",
+    "typeMoney": "Деньги",
+    "placeholderName": "Название...",
+    "placeholderBonus": "Приз или бонус...",
+    "placeholderDesc": "Описание...",
+    "labelPricePoints": "Цена (баллы)",
+    "labelAmountEuro": "Сумма (€)",
+    "btnAdd": "Добавить",
+    "levelsTitle": "Настройка уровней",
+    "clearConfirm": "Удалить все разовые задачи?",
+    "clearOld": "Очистить старые",
+    "templates": "Все задачи",
+    "dailyLoad": "Загрузка на день",
+    "requests": "Запросы",
+    "noRequests": "Нет новых запросов"
+  },
+  "auth": {
+    "welcome": "✨ Почти готово",
+    "finishRegistration": "Настрой свой профиль",
+    "namePlaceholder": "Твоё имя",
+    "roleChild": "Я ребенок",
+    "roleParent": "Я родитель",
+    "familyCodeLabel": "Код семьи (если есть)",
+    "familyCodePlaceholder": "Например: fam_xyz123",
+    "familyCodeHint": "* Если оставить пустым, мы создадим новую группу.",
+    "startAdventure": "Начать приключение! 🚀",
+    "loading": "Секундочку..."
+  },
+  "profile": {
+    "roleLabel": "Роль",
+    "familyIdLabel": "ID Семьи",
+    "parent": "Родитель",
+    "child": "Ребенок"
+  },
+  "familySettings": {
+    "title": "Управление профилями",
+    "inviteTitle": "Пригласить участников",
+    "inviteDesc": "Отправь ссылку ребенку или дай отсканировать QR-код",
+    "copyCode": "Копировать код",
+    "copied": "Скопировано!",
+    "shareLink": "Поделиться",
+    "addManual": "Добавить вручную",
+    "namePlaceholder": "Имя участника",
+    "pointsBalance": "Баллы",
+    "adminStatus": "Админ",
+    "deleteConfirm": "Удалить пользователя навсегда?"
+  },
+  "adminForm": {
+    "editTitle": "Редактирование",
+    "createTitle": "Новое задание",
+    "forLabel": "ДЛЯ",
+    "pointsLabel": "БАЛЛЫ",
+    "minutesLabel": "МИНУТЫ",
+    "saveBtn": "Сохранить",
+    "createBtn": "Создать задание",
+    "copyAsNewBtn": "Как новое"
+  },
+  "titles": {
+    "level_novice": "Новичок",
+    "level_apprentice": "Ученик",
+    "level_master": "Мастер",
+    "level_hero": "Герой",
+    "level_legend": "Легенда"
+  },
+  "shop_items": {
+    "shop_icecream": "Мороженое",
+    "shop_gaming": "30 мин приставки",
+    "shop_cinema": "Поход в кино",
+    "shop_money": "Деньги на карту"
+  },
+  "stats": {
+    "average": "Среднее в день",
+    "weekly": "За неделю",
+    "recentTitle": "Последние действия",
+    "noData": "Нет данных"
+  },
+  "howItWorks": {
+    "title": "Как это работает? 🚀",
+    "step1": {
+      "t": "Выполняй задачи",
+      "d": "Выбирай доступные задания в списке и жми «Начать»."
+    },
+    "step2": {
+      "t": "Жди проверки",
+      "d": "Родитель получит уведомление и подтвердит выполнение."
+    },
+    "step3": {
+      "t": "Копи баллы",
+      "d": "За каждое задание ты получаешь XP и баллы в копилку."
+    },
+    "step4": {
+      "t": "Трать в магазине",
+      "d": "Обменивай баллы на игровое время, сладости или реальные деньги."
+    }
+  }
+}

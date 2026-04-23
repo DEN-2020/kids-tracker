@@ -1,0 +1,147 @@
+{
+  "daily": "Päivän saldo",
+  "saved": "Säästössä",
+  "points": "pistettä",
+  "buy": "Käytä bonus-aikaa",
+  "noPoints": "Ei tarpeeksi pisteitä!",
+  "granted": "Peliaika myönnetty!",
+  "tasksTitle": "Tehtävät",
+  "statsTitle": "Tilastot",
+  "inProgress": "Menossa:",
+  "availableTasks": "Vapaat tehtävät:",
+  "done": "VALMIS ✅",
+  "logout": "Kirjaudu ulos",
+  "approve": "Salli aloitus ▶️",
+  "givePoints": "Anna pisteitä ✅",
+  "executing": "Suoritetaan...",
+  "noRequests": "Ei pyyntöjä",
+  "taskSettings": "Tehtävien hallinta",
+  "taskName": "Tehtävän nimi",
+  "averagePerDay": "Keskiarvo päivässä",
+  "perWeek": "Viikossa",
+  "noData": "Ei tietoja saatavilla",
+  "achievementsTab": "Tasot",
+  "shopTab": "Kauppa",
+  "loading": "Ladataan...",
+  "achievements": {
+    "title": "Saavutukset",
+    "nextLevel": "Seuraava taso:",
+    "needed": "Tarvitaan:",
+    "xp": "XP",
+    "bonus": "Sinun bonuksesi"
+  },
+  "shop": {
+    "title": "Kauppa",
+    "buyButton": "Osta",
+    "exchange": "Vaihto",
+    "buyPrefix": "Ostettu"
+  },
+  "tasks": {
+    "laksyt": "Läksyt",
+    "jumppa": "Aamujumppa",
+    "ulkoilu": "Ulkoilu",
+    "kissat": "Kissat",
+    "kotityot": "Kotityöt",
+    "kaytos": "Käytös"
+  },
+  "admin": {
+    "checkTasks": "Tarkistus",
+    "editTasks": "Mallit",
+    "settings": "Perhe",
+    "shopSettingsTitle": "Kaupan asetukset",
+    "typeReward": "Tuote",
+    "typeMoney": "Raha",
+    "placeholderName": "Nimi...",
+    "placeholderBonus": "Palkinto...",
+    "placeholderDesc": "Kuvaus...",
+    "labelPricePoints": "Hinta (pisteitä)",
+    "labelAmountEuro": "Summa (€)",
+    "btnAdd": "Lisää",
+    "levelsTitle": "Tasot ja saavutukset",
+    "clearConfirm": "Haluatko varmasti poistaa kaikki kertatehtävät?",
+    "clearOld": "Tyhjennä vanhat",
+    "templates": "Kaikki tehtävät",
+    "dailyLoad": "Päivän tilanne",
+    "requests": "Pyynnöt",
+    "noRequests": "Ei uusia pyyntöjä"
+  },
+  "auth": {
+    "welcome": "✨ Melkein valmista",
+    "finishRegistration": "Viimeistele profiilisi",
+    "namePlaceholder": "Sinun nimesi",
+    "roleChild": "Olen lapsi",
+    "roleParent": "Olen vanhempi",
+    "familyCodeLabel": "Perhekoodi (jos on)",
+    "familyCodePlaceholder": "Esim: fam_xyz123",
+    "familyCodeHint": "* Jos jätät tyhjäksi, luomme uuden perheryhmän.",
+    "startAdventure": "Aloita seikkailu! 🚀",
+    "loading": "Hetkinen..."
+  },
+  "profile": {
+    "roleLabel": "Rooli",
+    "familyIdLabel": "Perheen ID",
+    "parent": "Vanhempi",
+    "child": "Lapsi"
+  },
+  "familySettings": {
+    "title": "Profiilien hallinta",
+    "inviteTitle": "Kutsu jäseniä",
+    "inviteDesc": "Lähetä linkki lapselle tai anna skannata QR-koodi",
+    "copyCode": "Kopioi koodi",
+    "copied": "Kopioitu!",
+    "shareLink": "Jaa linkki",
+    "addManual": "Lisää manuaalisesti",
+    "namePlaceholder": "Jäsenen nimi",
+    "pointsBalance": "Pisteet",
+    "adminStatus": "Ylläpitäjä",
+    "deleteConfirm": "Poistetaanko käyttäjä pysyvästi?"
+  },
+  "adminForm": {
+    "editTitle": "Muokkaa tehtävää",
+    "createTitle": "Uusi tehtävä",
+    "forLabel": "KÄYTTÄJÄLLE",
+    "pointsLabel": "PISTEET",
+    "minutesLabel": "MINUUTIT",
+    "saveBtn": "Tallenna",
+    "createBtn": "Luo tehtävä",
+    "copyAsNewBtn": "Kopioi uusi"
+  },
+  "titles": {
+    "level_novice": "Aloittelija",
+    "level_apprentice": "Oppipoika",
+    "level_master": "Mestari",
+    "level_hero": "Sankari",
+    "level_legend": "Legenda"
+  },
+  "shop_items": {
+    "shop_icecream": "Jäätelö",
+    "shop_gaming": "30 min peliaikaa",
+    "shop_cinema": "Elokuva",
+    "shop_money": "Rahaa"
+  },
+  "stats": {
+    "average": "Keskiarvo päivässä",
+    "weekly": "Viikossa",
+    "recentTitle": "Viimeisimmät",
+    "noData": "Ei tietoja saatavilla"
+  },
+  "howItWorks": {
+    "title": "Miten se toimii? 🚀",
+    "step1": {
+      "t": "Tee tehtäviä",
+      "d": "Valitse tehtävä listalta ja paina «Aloita»."
+    },
+    "step2": {
+      "t": "Odota vahvistusta",
+      "d": "Vanhempi saa ilmoituksen ja hyväksyy suorituksen."
+    },
+    "step3": {
+      "t": "Kerää pisteitä",
+      "d": "Saat XP:tä ja pisteitä jokaisesta tehtävästä."
+    },
+    "step4": {
+      "t": "Käytä kaupassa",
+      "d": "Vaihda pisteet peliaikaan, herkkuun tai rahaan."
+    }
+  }
+}

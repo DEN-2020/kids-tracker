@@ -3,7 +3,8 @@ import coinSoundFile from '../../assets/coin.mp3';
 import successSoundFile from '../../assets/success.mp3';
 import holdSoundFile from '../../assets/hold.mp3';
 import styles from './Tasks.module.css';
-import { TaskItem } from './TaskItem'; // Импортируем наш новый компонент
+import { TaskItem } from './TaskItem';
+import { isRecordedToday } from '../../utils/dayKey';
 
 // --- ИНТЕРФЕЙСЫ ---
 interface Task {
@@ -16,6 +17,8 @@ interface Task {
   isAutoApprove?: boolean;
   isAutoPayout?: boolean;
   lastCompleted?: string;
+  lastCompletedAt?: Date | { toDate: () => Date } | string;
+  assignedTo?: string;
 }
 
 interface DisplayTask extends Task {
@@ -26,7 +29,7 @@ interface DisplayTask extends Task {
 
 interface Approval {
   id: string;
-  taskId: string;
+  taskId?: string;
   label: string;
   points: number;
   status: 'pending' | 'in_progress' | 'completed';
@@ -35,6 +38,7 @@ interface Approval {
 
 interface TaskListProps {
   userRole?: 'child' | 'parent'; 
+  lang?: 'fi' | 'ru' | 'en';
   t: {
     inProgress: string;
     availableTasks: string;
@@ -50,32 +54,76 @@ interface TaskListProps {
   requestToStart: (task: Task) => Promise<void>;
 }
 
+const textByLang = {
+  fi: {
+    dayGoal: 'Päivän tavoite',
+    parentStartConfirm: 'Haluatko merkitä tämän tehdyksi?',
+    parentApproveConfirm: 'Hyväksytkö?',
+    waiting: 'Odottaa...',
+    hoursShort: 't',
+    minutesShort: 'min',
+  },
+  ru: {
+    dayGoal: 'Цель на день',
+    parentStartConfirm: 'Выполнить за ребенка?',
+    parentApproveConfirm: 'Подтвердить?',
+    waiting: 'Ждем...',
+    hoursShort: 'ч',
+    minutesShort: 'м',
+  },
+  en: {
+    dayGoal: 'Daily goal',
+    parentStartConfirm: 'Mark this as done for the child?',
+    parentApproveConfirm: 'Approve this task?',
+    waiting: 'Waiting...',
+    hoursShort: 'h',
+    minutesShort: 'm',
+  },
+} as const;
+
+const resolveTaskListLang = (
+  explicitLang: TaskListProps['lang'],
+  t: TaskListProps['t'],
+): keyof typeof textByLang => {
+  if (explicitLang) return explicitLang;
+
+  const doneLabel = t.done.trim().toUpperCase();
+  if (doneLabel.startsWith('VALMIS')) return 'fi';
+  if (doneLabel.startsWith('ГОТОВО')) return 'ru';
+  return 'en';
+};
+
 export const TaskList: React.FC<TaskListProps> = ({ 
   t, availableTasks, myApprovals, runningTimer, 
   formatTime, startTaskTimer, markAsDone, requestToStart,
-  userRole 
+  userRole,
+  lang,
 }) => {
+  const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({
+    coin: new Audio(coinSoundFile),
+    success: new Audio(successSoundFile),
+    hold: new Audio(holdSoundFile)
+  });
+
   const [approvingId, setApprovingId] = useState<string | null>(null);
-  const [processingDoneIds, setProcessingDoneIds] = useState<string[]>([]);
   const [coins, setCoins] = useState<{id: number, left: string}[]>([]);
   const [holdId, setHoldId] = useState<string | null>(null);
   
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdSoundInterval = useRef<ReturnType<typeof setInterval> | null>(null);
-  const currentAudio = useRef<HTMLAudioElement | null>(null);
+  const uiText = textByLang[resolveTaskListLang(lang, t)];
 
-  const today = new Date().toISOString().split('T')[0];
-
-  // --- ЛОГИКА ЗВУКА И ЭФФЕКТОВ ---
-  const playSound = (soundFile: string, volume = 0.5) => {
-    if (currentAudio.current) {
-      currentAudio.current.pause();
-      currentAudio.current.currentTime = 0;
+  // --- ЛОГИКА ЗВУКА ---
+  const playSound = (type: 'coin' | 'success' | 'hold', volume = 0.5) => {
+    const audio = audioRefs.current[type];
+    if (!audio) return;
+    try {
+      audio.pause();
+      Object.assign(audio, { currentTime: 0, volume: volume });
+      audio.play().catch(() => {});
+    } catch {
+      // Игнорируем ошибки автоплея
     }
-    const audio = new Audio(soundFile);
-    audio.volume = volume;
-    currentAudio.current = audio;
-    audio.play().catch(() => {});
   };
 
   const stopHoldSound = () => {
@@ -83,9 +131,10 @@ export const TaskList: React.FC<TaskListProps> = ({
       clearInterval(holdSoundInterval.current);
       holdSoundInterval.current = null;
     }
-    if (currentAudio.current) {
-      currentAudio.current.pause();
-      currentAudio.current.currentTime = 0;
+    const audio = audioRefs.current.hold;
+    if (audio) {
+      audio.pause();
+      Object.assign(audio, { currentTime: 0 });
     }
   };
 
@@ -103,13 +152,18 @@ export const TaskList: React.FC<TaskListProps> = ({
     stopHoldSound();
     setHoldId(null);
     setApprovingId(task.id);
-    spawnCoins();
-    playSound(coinSoundFile);
     
-    setTimeout(async () => {
-      await requestToStart(task);
-      setApprovingId(null);
-    }, 800);
+    requestAnimationFrame(async () => {
+      try {
+        await requestToStart(task);
+        spawnCoins();
+        playSound('coin'); 
+      } catch {
+        console.error("Execute error");
+      } finally {
+        setApprovingId(null);
+      }
+    });
   };
 
   const startHolding = (task: DisplayTask) => {
@@ -117,18 +171,21 @@ export const TaskList: React.FC<TaskListProps> = ({
     if (hasActiveRequest || task.isDone || task.isInWork || task.isPending || approvingId === task.id || holdId === task.id) return;
 
     if (userRole === 'parent') {
-      const confirmAction = window.confirm(t.statsTitle === 'Tilastot' ? 'Haluatko merkitä tämän tehdyksi?' : 'Выполнить за ребенка?');
-      if (confirmAction) executeRequest(task);
+      Promise.resolve().then(() => {
+        const confirmAction = window.confirm(uiText.parentStartConfirm);
+        if (confirmAction) executeRequest(task);
+      });
       return;
     }
 
     stopHoldSound();
     setHoldId(task.id);
-    playSound(holdSoundFile, 0.2);
-    holdSoundInterval.current = setInterval(() => playSound(holdSoundFile, 0.2), 600);
+    playSound('hold', 0.2);
+    holdSoundInterval.current = setInterval(() => playSound('hold', 0.2), 600);
     holdTimer.current = setTimeout(() => executeRequest(task), 5000);
   };
 
+  // ТА САМАЯ ФУНКЦИЯ, КОТОРУЮ ПОТЕРЯЛИ
   const stopHolding = () => {
     if (holdTimer.current) {
       clearTimeout(holdTimer.current);
@@ -138,28 +195,50 @@ export const TaskList: React.FC<TaskListProps> = ({
     setHoldId(null);
   };
 
-  const handleDoneClick = async (approvalId: string, taskId: string) => {
+  const handleDoneClick = async (e: React.MouseEvent, approvalId: string) => {
+    e.stopPropagation();
+    if (approvingId === approvalId) return;
+
     if (userRole === 'parent') {
-        const confirmAction = window.confirm(t.statsTitle === 'Tilastot' ? 'Hyväksytkö?' : 'Подтвердить?');
+      Promise.resolve().then(async () => {
+        const confirmAction = window.confirm(uiText.parentApproveConfirm);
         if (!confirmAction) return;
+
+        setApprovingId(approvalId); 
+        try {
+          await markAsDone(approvalId);
+          spawnCoins();
+          playSound('success'); 
+        } catch {
+          console.error("Confirm error");
+        } finally {
+          setApprovingId(null);
+        }
+      });
+      return;
     }
-    setApprovingId(approvalId);
-    setProcessingDoneIds(prev => [...prev, taskId]);
-    spawnCoins();
-    playSound(successSoundFile);
     
-    setTimeout(async () => {
+    setApprovingId(approvalId); 
+    try {
       await markAsDone(approvalId);
+      spawnCoins();
+      playSound('success'); 
+    } catch {
       setApprovingId(null);
-      setTimeout(() => setProcessingDoneIds(prev => prev.filter(id => id !== taskId)), 2000);
-    }, 800);
+    }
   };
 
-  // --- ВЫЧИСЛЕНИЯ ДЛЯ ВЕРСТКИ ---
+  // --- ВЫЧИСЛЕНИЯ ---
   const allTasksForToday: DisplayTask[] = availableTasks.map(task => {
-    const isDone = task.lastCompleted === today;
     const approval = myApprovals.find(a => a.taskId === task.id);
-    return { ...task, isDone, isInWork: approval?.status === 'in_progress', isPending: approval?.status === 'pending' };
+    const isDone = isRecordedToday(task.lastCompleted, task.lastCompletedAt) || approval?.status === 'completed';
+    
+    return { 
+      ...task, 
+      isDone, 
+      isInWork: approval?.status === 'in_progress', 
+      isPending: approval?.status === 'pending' 
+    };
   });
 
   const pointsEarnedToday = allTasksForToday.filter(t => t.isDone).reduce((acc, t) => acc + t.points, 0);
@@ -171,8 +250,12 @@ export const TaskList: React.FC<TaskListProps> = ({
     const deadline = new Date();
     deadline.setHours(21, 0, 0, 0);
     const diffMs = deadline.getTime() - now.getTime();
+    const hours = Math.floor(diffMs / 3600000);
+    const minutes = Math.floor((diffMs % 3600000) / 60000);
     return {
-      text: diffMs > 0 ? `${Math.floor(diffMs / 3600000)}ч ${Math.floor((diffMs % 3600000) / 60000)}м` : 'Время вышло'
+      text: diffMs > 0
+        ? `${hours}${uiText.hoursShort} ${minutes}${uiText.minutesShort}`
+        : `0${uiText.hoursShort} 0${uiText.minutesShort}`
     };
   };
   const deadline = getDeadlineInfo();
@@ -181,10 +264,9 @@ export const TaskList: React.FC<TaskListProps> = ({
     <>
       {coins.map(c => <div key={c.id} className={styles.coin} style={{ left: c.left }}>💰</div>)}
 
-      {/* Прогресс */}
       <div className={styles.statsCard}>
         <div className={styles.statsInfo}>
-          <span style={{ fontWeight: '800', fontSize: '14px' }}>{t.statsTitle === 'Tilastot' ? 'Päivän tavoite' : 'Цель на день'}</span>
+          <span style={{ fontWeight: '800', fontSize: '14px' }}>{uiText.dayGoal}</span>
           <span style={{ fontWeight: '800', color: 'var(--accent-blue)' }}>{pointsEarnedToday} / {totalPointsPossible} 🏆</span>
         </div>
         <div className={styles.progressTrack}>
@@ -192,7 +274,6 @@ export const TaskList: React.FC<TaskListProps> = ({
         </div>
       </div>
 
-      {/* В работе */}
       <h3 style={{ color: 'var(--accent-green)', marginBottom: '15px' }}>{t.inProgress}</h3>
       <div style={{ display: 'grid', gap: '15px', marginBottom: '30px' }}>
         {myApprovals.filter(a => a.status === 'in_progress').map(a => {
@@ -208,7 +289,12 @@ export const TaskList: React.FC<TaskListProps> = ({
                 {!isProcessing && !runningTimer && taskInfo?.duration && (
                   <button onClick={() => startTaskTimer(a.id, taskInfo.duration!)} style={{ padding: '10px', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: '12px' }}>▶️</button>
                 )}
-                <button onClick={() => handleDoneClick(a.id, a.taskId)} disabled={isProcessing} className="payout-btn">
+                <button 
+                  onClick={(e) => handleDoneClick(e, a.id)} 
+                  disabled={isProcessing} 
+                  className="payout-btn"
+                  style={{ zIndex: 999, position: 'relative', cursor: 'pointer' }}
+                >
                   {isProcessing ? '⏳' : t.done}
                 </button>
               </div>
@@ -217,12 +303,10 @@ export const TaskList: React.FC<TaskListProps> = ({
         })}
       </div>
 
-      {/* Доступные (ИСПОЛЬЗУЕМ TASKITEM) */}
       <h3 style={{ color: 'var(--accent-blue)', marginBottom: '15px' }}>{t.availableTasks}</h3>
       <div className={styles.tasksGrid}>
         {allTasksForToday.map(task => {
-          if (task.isDone || task.isInWork || approvingId === task.id || processingDoneIds.includes(task.id)) return null;
-          
+          if (task.isDone || task.isInWork || approvingId === task.id) return null;
           const isWaiting = task.isPending || myApprovals.some(a => a.taskId === task.id);
 
           return (
@@ -232,7 +316,7 @@ export const TaskList: React.FC<TaskListProps> = ({
               isWaiting={isWaiting}
               isHolding={holdId === task.id}
               deadlineText={deadline.text}
-              waitingLabel={t.statsTitle === 'Tilastot' ? 'Odottaa...' : 'Ждем...'}
+              waitingLabel={uiText.waiting}
               onStart={() => startHolding(task)}
               onStop={stopHolding}
             />

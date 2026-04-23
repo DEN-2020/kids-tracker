@@ -1,0 +1,207 @@
+/* Auth.module.css */
+.authPage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.mainTitle {
+  color: var(--text-main); /* Было: white */
+  font-size: 32px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  margin-bottom: 20px;
+}
+
+
+.glassForm {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  width: 100%;
+  max-width: 340px;
+  /* Используем переменную темы, чтобы на светлом фоне карточка была белой, 
+     а на темном — темно-синей */
+  background: var(--card-bg); 
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  padding: 30px;
+  border-radius: 28px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+  box-sizing: border-box;
+  margin-bottom: 20px;
+}
+
+.formTitle {
+  margin: 0 0 5px 0;
+  color: var(--text-main); /* Было: white */
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+.errorBox {
+  background-color: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  padding: 10px;
+  border-radius: 12px;
+  font-size: 14px;
+  text-align: center;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.glassInput {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  /* Делаем инпут контрастным относительно фона карточки */
+  background: var(--bg-color); 
+  color: var(--text-main); /* Было: white */
+  font-size: 16px;
+  border: 1px solid var(--border-color);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.glassInput:focus {
+  border-color: var(--accent-blue);
+  /* Убираем жесткий черный rgba, используем переменную с прозрачностью */
+  background: var(--card-bg); 
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2); /* Добавляем кольцо фокуса для Accessibility */
+}
+
+.submitBtn {
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--accent-green);
+  /* Используем черный текст, если зеленый светлый, 
+     или очень жирный белый для максимального контраста */
+  color: #000000; 
+  border: none;
+  font-weight: 800; /* Жирный шрифт критичен для контраста */
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.submitBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.submitBtn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.switchBtn {
+  background: none;
+  border: none;
+  /* Синий на темном фоне часто не проходит контраст. 
+     Сделаем его светлее для темной темы. */
+  color: var(--accent-blue);
+  font-size: 14px; /* Чуть увеличим размер */
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 10px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.divider {
+  color: var(--text-main);
+  font-weight: bold;
+  opacity: 1; /* Убери прозрачность, она убивает контраст */
+}
+
+.googleBtn {
+  padding: 14px 24px;
+  font-size: 16px;
+  border-radius: 16px;
+  background: var(--card-bg);
+  color: var(--text-main); /* Было: white */
+  border: 1px solid var(--border-color);
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: var(--shadow);
+  transition: all 0.3s ease;
+}
+
+.googleBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.googleIcon {
+  width: 20px;
+}
+
+
+/* Дополнения для RegisterPage в Auth.module.css */
+
+.avatarBig {
+  font-size: 64px;
+  margin-bottom: 15px;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.2));
+  text-align: center;
+}
+
+.roleSelection {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.roleCard {
+  flex: 1;
+  padding: 20px;
+  border-radius: 20px;
+  cursor: pointer;
+  background: var(--card-bg);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+  text-align: center;
+}
+
+.roleCardActive {
+  background: rgba(0, 122, 255, 0.15) !important;
+  border-color: var(--accent-blue) !important;
+}
+
+.roleEmoji {
+  font-size: 32px;
+}
+
+.roleLabel {
+  font-weight: bold;
+  color: var(--text-main);
+  margin-top: 5px;
+}
+
+.inputGroup {
+  margin-bottom: 20px;
+  text-align: left;
+}
+
+.label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-left: 10px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 8px 10px 0;
+}
+
+.googleIcon {
+  margin-right: 10px; 
+  flex-shrink: 0;    
+}

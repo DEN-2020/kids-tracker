@@ -1,0 +1,135 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function selfUid() {
+      return request.auth.uid;
+    }
+
+    function hasProfile() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(selfUid()));
+    }
+
+    function currentProfile() {
+      return get(/databases/$(database)/documents/users/$(selfUid()));
+    }
+
+    function isParent() {
+      return hasProfile() && currentProfile().data.role == 'parent';
+    }
+
+    function sameFamily(familyId) {
+      return hasProfile() && currentProfile().data.familyId == familyId;
+    }
+
+    function sameFamilyUser(userId) {
+      return hasProfile() &&
+        userId is string &&
+        exists(/databases/$(database)/documents/users/$(userId)) &&
+        get(/databases/$(database)/documents/users/$(userId)).data.familyId == currentProfile().data.familyId;
+    }
+
+    function requestInOwnFamily() {
+      return request.resource.data.familyId is string &&
+        sameFamily(request.resource.data.familyId);
+    }
+
+    function resourceInOwnFamily() {
+      return resource.data.familyId is string &&
+        sameFamily(resource.data.familyId);
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() &&
+        (userId == selfUid() || sameFamily(resource.data.familyId));
+
+      allow create: if isSignedIn() && (
+        (
+          userId == selfUid() &&
+          request.resource.data.uid == selfUid() &&
+          request.resource.data.familyId is string &&
+          (request.resource.data.role == 'child' || request.resource.data.role == 'parent') &&
+          request.resource.data.currentBalance == 0 &&
+          request.resource.data.totalPoints == 0
+        ) ||
+        (
+          isParent() &&
+          request.resource.data.familyId == currentProfile().data.familyId &&
+          request.resource.data.currentBalance == 0 &&
+          request.resource.data.totalPoints == 0
+        )
+      );
+
+      allow update: if isSignedIn() && (
+        (
+          userId == selfUid() &&
+          request.resource.data.familyId == resource.data.familyId &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.uid == resource.data.uid
+        ) ||
+        (
+          isParent() &&
+          sameFamily(resource.data.familyId) &&
+          request.resource.data.familyId == resource.data.familyId
+        )
+      );
+
+      allow delete: if isSignedIn() &&
+        (userId == selfUid() || (isParent() && sameFamily(resource.data.familyId)));
+    }
+
+    match /tasks_list/{taskId} {
+      allow read: if isSignedIn() && resourceInOwnFamily() && (
+        isParent() ||
+        resource.data.assignedTo == selfUid() ||
+        resource.data.assignedTo == 'all'
+      );
+
+      allow create: if isSignedIn() && isParent() && requestInOwnFamily();
+      allow update: if isSignedIn() && isParent() && resourceInOwnFamily() && requestInOwnFamily();
+      allow delete: if isSignedIn() && isParent() && resourceInOwnFamily();
+    }
+
+    match /approvals/{approvalId} {
+      allow read: if isSignedIn() && resourceInOwnFamily() &&
+        (resource.data.userId == selfUid() || isParent());
+
+      allow create: if isSignedIn() &&
+        requestInOwnFamily() &&
+        request.resource.data.userId is string &&
+        sameFamilyUser(request.resource.data.userId) &&
+        (request.resource.data.userId == selfUid() || isParent());
+
+      allow delete: if isSignedIn() &&
+        resourceInOwnFamily() &&
+        (resource.data.userId == selfUid() || isParent());
+    }
+
+    match /history/{historyId} {
+      allow read: if isSignedIn() && resourceInOwnFamily() &&
+        (resource.data.userId == selfUid() || isParent());
+
+      allow create: if isSignedIn() &&
+        requestInOwnFamily() &&
+        request.resource.data.userId is string &&
+        sameFamilyUser(request.resource.data.userId) &&
+        (request.resource.data.userId == selfUid() || isParent());
+    }
+
+    match /achievements_list/{itemId} {
+      allow read: if isSignedIn() && resourceInOwnFamily();
+      allow create: if isSignedIn() && isParent() && requestInOwnFamily();
+      allow update: if isSignedIn() && isParent() && resourceInOwnFamily() && requestInOwnFamily();
+      allow delete: if isSignedIn() && isParent() && resourceInOwnFamily();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

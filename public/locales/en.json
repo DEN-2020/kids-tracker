@@ -1,0 +1,147 @@
+{
+  "daily": "Daily balance",
+  "saved": "Saved",
+  "points": "points",
+  "buy": "Use bonus time",
+  "noPoints": "Not enough points!",
+  "granted": "Time granted!",
+  "tasksTitle": "Tasks",
+  "statsTitle": "Statistics",
+  "inProgress": "In progress:",
+  "availableTasks": "Available tasks:",
+  "done": "DONE ✅",
+  "logout": "Logout",
+  "approve": "Approve start ▶️",
+  "givePoints": "Give points ✅",
+  "executing": "Executing...",
+  "noRequests": "No requests",
+  "taskSettings": "Task settings",
+  "taskName": "Task name",
+  "averagePerDay": "Daily average",
+  "perWeek": "Per week",
+  "noData": "No data available",
+  "achievementsTab": "Levels",
+  "shopTab": "Shop",
+  "loading": "Loading...",
+  "achievements": {
+    "title": "Achievements",
+    "nextLevel": "Next level:",
+    "needed": "Needed:",
+    "xp": "XP",
+    "bonus": "Your bonus"
+  },
+  "shop": {
+    "title": "Bonus Shop",
+    "buyButton": "Buy",
+    "exchange": "Exchange",
+    "buyPrefix": "Purchased"
+  },
+  "tasks": {
+    "laksyt": "Homework",
+    "jumppa": "Morning gym",
+    "ulkoilu": "Outdoors",
+    "kissat": "Feed cats",
+    "kotityot": "Housework",
+    "kaytos": "Behavior"
+  },
+  "admin": {
+    "checkTasks": "Review",
+    "editTasks": "Templates",
+    "settings": "Family",
+    "shopSettingsTitle": "Shop Settings",
+    "typeReward": "Item",
+    "typeMoney": "Money",
+    "placeholderName": "Name...",
+    "placeholderBonus": "Reward or bonus...",
+    "placeholderDesc": "Description...",
+    "labelPricePoints": "Price (pts)",
+    "labelAmountEuro": "Amount (€)",
+    "btnAdd": "Add",
+    "levelsTitle": "Levels & Achievements",
+    "clearConfirm": "Are you sure you want to delete all one-time tasks?",
+    "clearOld": "Clear old",
+    "templates": "All tasks",
+    "dailyLoad": "Daily status",
+    "requests": "Requests",
+    "noRequests": "No new requests"
+  },
+  "auth": {
+    "welcome": "✨ Almost ready",
+    "finishRegistration": "Set up your profile",
+    "namePlaceholder": "Your name",
+    "roleChild": "I'm a child",
+    "roleParent": "I'm a parent",
+    "familyCodeLabel": "Family code (if any)",
+    "familyCodePlaceholder": "Example: fam_xyz123",
+    "familyCodeHint": "* If left empty, a new family group will be created.",
+    "startAdventure": "Start adventure! 🚀",
+    "loading": "One moment..."
+  },
+  "profile": {
+    "roleLabel": "Role",
+    "familyIdLabel": "Family ID",
+    "parent": "Parent",
+    "child": "Child"
+  },
+  "familySettings": {
+    "title": "Profile Management",
+    "inviteTitle": "Invite Members",
+    "inviteDesc": "Send link or scan QR",
+    "copyCode": "Copy code",
+    "copied": "Copied!",
+    "shareLink": "Share",
+    "addManual": "Add manually",
+    "namePlaceholder": "Member name",
+    "pointsBalance": "Points",
+    "adminStatus": "Admin",
+    "deleteConfirm": "Delete user permanently?"
+  },
+  "adminForm": {
+    "editTitle": "Edit Task",
+    "createTitle": "New Task",
+    "forLabel": "FOR",
+    "pointsLabel": "POINTS",
+    "minutesLabel": "MINUTES",
+    "saveBtn": "Save",
+    "createBtn": "Create Task",
+    "copyAsNewBtn": "As New"
+  },
+  "titles": {
+    "level_novice": "Novice",
+    "level_apprentice": "Apprentice",
+    "level_master": "Master",
+    "level_hero": "Hero",
+    "level_legend": "Legend"
+  },
+  "shop_items": {
+    "shop_icecream": "Ice cream",
+    "shop_gaming": "30 min gaming",
+    "shop_cinema": "Cinema trip",
+    "shop_money": "Cash out"
+  },
+  "stats": {
+    "average": "Daily average",
+    "weekly": "Weekly",
+    "recentTitle": "Recent action",
+    "noData": "No Data"
+  },
+  "howItWorks": {
+    "title": "How it works? 🚀",
+    "step1": {
+      "t": "Complete Tasks",
+      "d": "Pick an available task from the list and tap \"Start\"."
+    },
+    "step2": {
+      "t": "Wait for Approval",
+      "d": "Your parent will get a notification to review and approve your work."
+    },
+    "step3": {
+      "t": "Earn Points",
+      "d": "For every task, you get XP and points added to your balance."
+    },
+    "step4": {
+      "t": "Spend in Shop",
+      "d": "Exchange your points for gaming time, treats, or real rewards."
+    }
+  }
+}

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { db } from '../../firebase';
-import { collection, onSnapshot, setDoc, doc, deleteDoc } from 'firebase/firestore';
+import { db } from '../../db';
+import { collection, onSnapshot, setDoc, doc, deleteDoc, query, where } from 'firebase/firestore';
 import styles from './Admin.module.css';
 import type { TranslationContent } from '../../translations';
+import { deleteCatalogItemMutation, upsertCatalogItemMutation } from '../../services/server';
 
 interface ShopItem {
   id: string;
@@ -12,13 +13,14 @@ interface ShopItem {
   label: string;
   description?: string; 
   valueInEuro?: number;
+  familyId?: string;
 }
 
 const SHOP_ICONS = ['🎁', '🍦', '🎮', '🚲', '🎬', '💶', '🍕', '🧸', '🕙', '📱', '⚽', '🍩'];
 
-export const ShopSettings = ({ t }: { t: TranslationContent }) => {
+export const ShopSettings = ({ t, familyId }: { t: TranslationContent; familyId: string }) => {
   const [items, setItems] = useState<ShopItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadedFamilyId, setLoadedFamilyId] = useState('');
 
   // Состояние формы
   const [label, setLabel] = useState('');
@@ -29,9 +31,13 @@ export const ShopSettings = ({ t }: { t: TranslationContent }) => {
   const [euroValue, setEuroValue] = useState(0);
 
   const adm = t.admin || {}; 
+  const loading = !!familyId && loadedFamilyId !== familyId;
+  const visibleItems = familyId && loadedFamilyId === familyId ? items : [];
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "achievements_list"), (snap) => {
+    if (!familyId) return;
+
+    const unsub = onSnapshot(query(collection(db, "achievements_list"), where("familyId", "==", familyId)), (snap) => {
       const data = snap.docs.map(d => {
         const itemData = d.data();
         return { 
@@ -46,25 +52,39 @@ export const ShopSettings = ({ t }: { t: TranslationContent }) => {
         .sort((a, b) => a.threshold - b.threshold);
         
       setItems(filtered);
-      setLoading(false);
+      setLoadedFamilyId(familyId);
     });
     return () => unsub();
-  }, []);
+  }, [familyId]);
 
   const saveItem = async () => {
-    if (!label) return;
+    if (!label || !familyId) return;
     const id = `${type}_${Date.now()}`;
-    await setDoc(doc(db, "achievements_list", id), {
+    const itemData = {
       threshold,
       icon,
       type,
       label,
-      description, // Сохраняем описание
+      familyId,
+      description,
       ...(type === 'exchange' && { valueInEuro: euroValue })
-    });
+    };
+
+    await upsertCatalogItemMutation(
+      { itemId: id, item: itemData },
+      async () => setDoc(doc(db, "achievements_list", id), itemData),
+    );
     setLabel(''); 
     setDescription(''); // Сбрасываем поле
     setEuroValue(0);
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    if (!window.confirm(t.familySettings.deleteConfirm)) return;
+    await deleteCatalogItemMutation(
+      { itemId },
+      async () => deleteDoc(doc(db, "achievements_list", itemId)),
+    );
   };
 
   if (loading) return <div className={styles.spinner}>⌛</div>;
@@ -131,7 +151,7 @@ export const ShopSettings = ({ t }: { t: TranslationContent }) => {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <div key={item.id} className={styles.templateItem} style={{ borderLeft: `4px solid ${item.type === 'reward' ? 'var(--accent-green)' : 'var(--accent-blue)'}` }}>
             <div className={styles.templateInfo}>
               <span style={{ fontSize: '24px' }}>{item.icon}</span>
@@ -146,7 +166,7 @@ export const ShopSettings = ({ t }: { t: TranslationContent }) => {
               </div>
             </div>
             <button 
-              onClick={() => window.confirm(t.familySettings.deleteConfirm) && deleteDoc(doc(db, "achievements_list", item.id))} 
+              onClick={() => handleDeleteItem(item.id)} 
               className={styles.deleteBtn}
             >&times;</button>
           </div>

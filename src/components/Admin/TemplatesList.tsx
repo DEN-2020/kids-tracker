@@ -1,5 +1,5 @@
 import { deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../../firebase';
+import { db } from '../../db';
 import styles from './Admin.module.css';
 // 1. Добавляем импорт типа
 import type { TranslationContent } from '../../translations'; 

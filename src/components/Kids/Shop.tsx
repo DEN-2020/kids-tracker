@@ -1,18 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { db } from '../../firebase';
-// Исправлен импорт типов (добавлено type)
-import { collection, onSnapshot, addDoc } from 'firebase/firestore';
-import type { QueryDocumentSnapshot, DocumentData } from 'firebase/firestore';
+import { db } from '../../db';
+import { collection, onSnapshot, addDoc, query, where } from 'firebase/firestore';
 import styles from './Tasks.module.css'; 
 import holdSoundFile from '../../assets/hold.mp3';
 import successSoundFile from '../../assets/success.mp3';
 import type { TranslationContent } from '../../translations';
+import { submitApprovalMutation } from '../../services/server';
 
 interface ShopItem {
   id: string;
   threshold: number;
   icon: string;
   type: 'reward' | 'exchange';
+  familyId?: string;
   label?: string;
   labelRu?: string;
   labels?: { [key: string]: string };
@@ -23,64 +23,141 @@ interface ShopProps {
   t: TranslationContent;
   currentBalance: number;
   userId: string;
-  lang: string;
+  familyId: string;
+  lang: 'fi' | 'ru' | 'en';
+  userRole?: 'child' | 'parent'; // ДОБАВИЛИ РОЛЬ
 }
 
-export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, lang }) => {
+export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId, lang, userRole }) => {
   const [items, setItems] = useState<ShopItem[]>([]);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [shakingErrorId, setShakingErrorId] = useState<string | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [loadedFamilyId, setLoadedFamilyId] = useState('');
   
   const timerRef = useRef<number | null>(null);
   const holdSound = useRef(new Audio(holdSoundFile)).current;
   const successSound = useRef(new Audio(successSoundFile)).current;
+  const isLoaded = !familyId || loadedFamilyId === familyId;
+  const visibleItems = isLoaded ? items : [];
+  const uiText = {
+    fi: {
+      purchaseSent: 'Tilaus lähetetty!',
+      confirmPurchase: (itemName: string) => `Osta "${itemName}"?`,
+    },
+    ru: {
+      purchaseSent: 'Запрос отправлен!',
+      confirmPurchase: (itemName: string) => `Купить "${itemName}"?`,
+    },
+    en: {
+      purchaseSent: 'Request sent!',
+      confirmPurchase: (itemName: string) => `Buy "${itemName}"?`,
+    },
+  }[lang];
 
   useEffect(() => {
-    console.log("SHOP: Start listening. User:", userId);
-    const unsub = onSnapshot(collection(db, "achievements_list"), (snap) => {
-      const data = snap.docs.map((d: QueryDocumentSnapshot<DocumentData>) => ({
-        id: d.id,
-        ...d.data()
-      } as ShopItem))
-      .filter(item => item.type === 'reward' || item.type === 'exchange')
-      .sort((a, b) => a.threshold - b.threshold);
+    if (!familyId) return;
 
-      setItems(data);
-      setIsLoaded(true);
-    }, (err) => {
-      console.error("SHOP Error:", err);
-      setIsLoaded(true);
-    });
-    return () => unsub();
-  }, [userId]);
+    const unsubscribe = onSnapshot(
+      query(collection(db, "achievements_list"), where("familyId", "==", familyId)),
+      (snap) => {
+        const nextItems = snap.docs
+          .map((d) => ({
+            id: d.id,
+            ...d.data(),
+          } as ShopItem))
+          .filter((item) => item.type === 'reward' || item.type === 'exchange')
+          .sort((a, b) => a.threshold - b.threshold);
+        setItems(nextItems);
+        setLoadedFamilyId(familyId);
+      },
+      (err) => {
+        console.error("SHOP query error:", err);
+        setItems([]);
+        setLoadedFamilyId(familyId);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [familyId]);
 
   const getItemName = (item: ShopItem) => {
-    return item.label || item.labelRu || (item.labels ? (item.labels[lang] || item.labels['ru']) : '—');
+    return (
+      item.labels?.[lang]
+      || item.label
+      || item.labelRu
+      || item.labels?.en
+      || item.labels?.ru
+      || item.labels?.fi
+      || '—'
+    );
+  };
+
+  // Вынесли логику отправки в отдельную функцию для удобства
+  const executePurchase = async (item: ShopItem) => {
+    const itemName = getItemName(item);
+    try {
+      successSound.currentTime = 0;
+      successSound.play().catch(() => {});
+
+      await submitApprovalMutation({
+        familyId,
+        icon: item.icon,
+        label: `${t.admin.typeReward}: ${itemName}`,
+        points: -Number(item.threshold),
+        status: 'pending',
+        userId,
+      }, async () => addDoc(collection(db, "approvals"), {
+        userId,
+        familyId,
+        label: `${t.admin.typeReward}: ${itemName}`,
+        points: -Number(item.threshold),
+        icon: item.icon,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      }));
+
+      alert(uiText.purchaseSent);
+    } catch (error) {
+      console.error("Ошибка покупки:", error);
+    }
   };
 
   const handleStartHold = (item: ShopItem) => {
-    if (currentBalance < item.threshold) {
+    if (holdId) return;
+
+    // ЛОГИКА ДЛЯ РОДИТЕЛЯ: Мгновенное подтверждение
+    if (userRole === 'parent') {
+      const confirmMsg = uiText.confirmPurchase(getItemName(item));
+      if (window.confirm(confirmMsg)) {
+        executePurchase(item);
+      }
+      return;
+    }
+
+    // ЛОГИКА ДЛЯ РЕБЕНКА
+    const price = Number(item.threshold);
+    const balance = Number(currentBalance);
+
+    if (balance < price) {
       setShakingErrorId(item.id);
       setTimeout(() => setShakingErrorId(null), 500);
       return;
     }
+
     setHoldId(item.id);
     holdSound.currentTime = 0;
     holdSound.play().catch(() => {});
+
     timerRef.current = window.setTimeout(async () => {
-      const itemName = getItemName(item);
+      if (Number(currentBalance) < Number(item.threshold)) {
+        setHoldId(null);
+        setShakingErrorId(item.id);
+        setTimeout(() => setShakingErrorId(null), 500);
+        return;
+      }
+
       holdSound.pause();
-      successSound.currentTime = 0;
-      successSound.play().catch(() => {});
-      await addDoc(collection(db, "approvals"), {
-        userId,
-        label: `${t.admin.typeReward}: ${itemName}`,
-        points: -item.threshold,
-        icon: item.icon,
-        status: 'pending',
-        createdAt: new Date().toISOString()
-      });
+      await executePurchase(item);
       setHoldId(null);
     }, 5000); 
   };
@@ -96,14 +173,13 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, lang }) =
   return (
     <div style={{ padding: '10px' }}>
       <h3 className={styles.statsInfo}>
-        <span style={{ color: 'var(--accent-green)' }}>{t.admin.shopSettingsTitle}</span> 
-        <span style={{ color: 'var(--text-main)' }}>💰 {currentBalance}</span>
+        <span style={{ color: 'var(--accent-green)' }}>{t.shop?.title || 'Shop'}</span> 
+        <span style={{ color: 'var(--text-main)' }}> 💰 {currentBalance}</span>
       </h3>
       
       <div className={styles.tasksGrid} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
-        {items.map((item) => {
+        {visibleItems.map((item) => {
           const itemName = getItemName(item);
-          // ТЕПЕРЬ ПЕРЕМЕННЫЕ ИСПОЛЬЗУЮТСЯ - ОШИБКИ ИСЧЕЗНУТ
           const isHolding = holdId === item.id;
           const isError = shakingErrorId === item.id;
           const canAfford = currentBalance >= item.threshold;
@@ -118,13 +194,13 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, lang }) =
               onTouchEnd={handleStopHold}
               className={`
                 ${styles.shopCard || ''} 
-                ${canAfford ? (styles.shopCardAffordable || '') : (styles.shopCardLocked || '')}
+                ${canAfford || userRole === 'parent' ? (styles.shopCardAffordable || '') : (styles.shopCardLocked || '')}
                 ${isHolding ? (styles.shakingIntense || '') : ''} 
                 ${isError ? (styles.insufficientFunds || '') : ''}
               `}
               style={{
                 background: 'rgba(255,255,255,0.05)',
-                border: isError ? '2px solid red' : '1px solid #444',
+                border: isError ? '2px solid red' : isHolding ? '2px solid var(--accent-green)' : '1px solid #444',
                 padding: '15px',
                 borderRadius: '20px',
                 display: 'flex',
@@ -132,10 +208,12 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, lang }) =
                 alignItems: 'center',
                 minHeight: '140px',
                 position: 'relative',
-                overflow: 'hidden'
+                overflow: 'hidden',
+                touchAction: 'none', 
+                userSelect: 'none',
+                cursor: 'pointer'
               }}
             >
-              {/* Прогресс бар при удержании */}
               {isHolding && (
                 <div style={{
                   position: 'absolute',
@@ -152,7 +230,7 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, lang }) =
               <div style={{fontWeight: 'bold', textAlign: 'center', color: 'white'}}>{itemName}</div>
               
               <div style={{
-                background: canAfford ? 'var(--accent-green)' : '#666',
+                background: (canAfford || userRole === 'parent') ? 'var(--accent-green)' : '#666',
                 color: 'white',
                 padding: '2px 10px',
                 borderRadius: '10px',

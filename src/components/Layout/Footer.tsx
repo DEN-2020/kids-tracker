@@ -2,7 +2,7 @@ import React from 'react';
 // Импортируем версию из package.json (если конфиг позволяет)
 // Или просто задаем вручную, что даже надежнее для контроля
 // Берем версию прямо из файла package.json
-const APP_VERSION = import.meta.env.PACKAGE_VERSION || "1.0.2"; 
+const APP_VERSION = import.meta.env.VITE_PACKAGE_VERSION || "1.0.1";
 
 // Автоматическая дата сборки (создается в момент запуска npm run build)
 const BUILD_DATE = new Date().toLocaleDateString('ru-RU', {
