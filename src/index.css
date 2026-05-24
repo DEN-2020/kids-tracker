@@ -171,18 +171,24 @@ button:active {
   display: inline-block;
 }
 
-.offline-notice {
+.pwa-toast-stack {
   position: fixed;
   top: calc(env(safe-area-inset-top, 0px) + 12px);
   left: 50%;
   z-index: 10000;
+  display: grid;
+  gap: 8px;
+  width: min(calc(100vw - 32px), 560px);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.pwa-toast {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: min(calc(100vw - 32px), 520px);
   min-height: 40px;
   padding: 10px 14px;
-  border: 1px solid rgba(245, 158, 11, 0.35);
   border-radius: 8px;
   background: rgba(15, 23, 42, 0.92);
   color: #fff7ed;
@@ -191,12 +197,66 @@ button:active {
   font-size: 14px;
   font-weight: 650;
   line-height: 1.35;
-  transform: translateX(-50%);
+  pointer-events: auto;
 }
 
-.offline-notice svg {
+.pwa-toast svg {
   flex: 0 0 auto;
+}
+
+.pwa-toast span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pwa-toast-warning {
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+.pwa-toast-warning svg {
   color: var(--accent-orange);
+}
+
+.pwa-toast-info {
+  border: 1px solid rgba(129, 140, 248, 0.45);
+}
+
+.pwa-toast-info svg {
+  color: var(--accent-blue);
+}
+
+.pwa-toast-success {
+  border: 1px solid rgba(16, 185, 129, 0.45);
+}
+
+.pwa-toast-success svg {
+  color: var(--accent-green);
+}
+
+.pwa-toast-action,
+.pwa-toast-icon {
+  flex: 0 0 auto;
+  border: 0;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.pwa-toast-action {
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.pwa-toast-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 999px;
 }
 
 @keyframes pulse-orange {
