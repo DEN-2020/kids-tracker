@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db } from '../../db';
-import { 
-  collection, addDoc, deleteDoc, doc, 
+import {
+  collection, addDoc, deleteDoc, doc,
   updateDoc, onSnapshot, query, where
 } from 'firebase/firestore';
 import type { TranslationContent } from '../../translations';
@@ -61,6 +61,10 @@ export const AdminPanel = ({ t, selectedChildId, familyId, mode, lang }: AdminPa
   const [tasks, setTasks] = useState<DbTask[]>([]);
   const [approvals, setApprovals] = useState<ApprovalRequest[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [processingApprovalId, setProcessingApprovalId] = useState<string | null>(null);
+  const [isSavingTask, setIsSavingTask] = useState(false);
+  const [isClearingTasks, setIsClearingTasks] = useState(false);
+  const [approvalError, setApprovalError] = useState('');
 
   const [newLabel, setNewLabel] = useState('');
   const [newPoints, setNewPoints] = useState(10);
@@ -75,6 +79,24 @@ export const AdminPanel = ({ t, selectedChildId, familyId, mode, lang }: AdminPa
     ru: 'Не удалось сохранить задачу',
     en: 'Failed to save task',
   } as const;
+  const busyTextByLang = {
+    fi: {
+      syncing: 'Synkronoidaan...',
+      clearing: 'Poistetaan...',
+      saving: 'Tallennetaan...',
+    },
+    ru: {
+      syncing: 'Синхронизация...',
+      clearing: 'Удаляем...',
+      saving: 'Сохраняем...',
+    },
+    en: {
+      syncing: 'Syncing...',
+      clearing: 'Clearing...',
+      saving: 'Saving...',
+    },
+  } as const;
+  const busyText = busyTextByLang[lang];
 
   useEffect(() => {
     if (!familyId) return;
@@ -110,46 +132,54 @@ export const AdminPanel = ({ t, selectedChildId, familyId, mode, lang }: AdminPa
     setNewDuration(task.duration || 0);
     setAutoRepeat(!!task.isAutoRepeat);
     setAutoApprove(!!task.isAutoApprove);
-    setAutoPayout(!!task.isAutoPayout);
-    setEditingId(task.id);
+    setAutoPayout(!!task.isAutoApprove && !!task.isAutoPayout);
+    setEditingId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
 const handleFinalApprove = async (app: ApprovalRequest) => {
-  if (!app.userId) return;
-
-  // 1. Оптимистичное обновление: сразу убираем из списка на экране
-  setApprovals(prev => prev.filter(item => item.id !== app.id));
+  if (!app.userId || processingApprovalId === app.id) return;
 
   try {
+    setProcessingApprovalId(app.id);
+    setApprovalError('');
     await completeTransaction(app.id, app.userId, app.points, app.taskId, {
       familyId,
       label: app.label,
     });
-  } catch (err) { 
-    console.error("Ошибка при одобрении:", err); 
-    // В случае ошибки можно перезагрузить данные из базы, чтобы запрос вернулся в список
+  } catch (err) {
+    console.error("Ошибка при одобрении:", err);
+    setApprovalError(
+      lang === 'fi'
+        ? 'Pyynnön hyväksyminen epäonnistui. Tarkista saldo ja yritä uudelleen.'
+        : lang === 'ru'
+          ? 'Не удалось одобрить заявку. Проверь баланс ребёнка и попробуй ещё раз.'
+          : 'Failed to approve the request. Check the child balance and try again.',
+    );
+  } finally {
+    setProcessingApprovalId(null);
   }
 };
 
 const addTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newLabel || !selectedChildId || !familyId) return;
+    if (!newLabel || !selectedChildId || !familyId || isSavingTask) return;
 
     // Подготавливаем данные
-    const taskData = { 
-      label: newLabel, 
-      points: Number(newPoints), 
+    const taskData = {
+      label: newLabel,
+      points: Number(newPoints),
       icon: newIcon,
       duration: newDuration > 0 ? Number(newDuration) : null,
-      isAutoRepeat: autoRepeat, 
+      isAutoRepeat: autoRepeat,
       isAutoApprove: autoApprove,
-      isAutoPayout: autoPayout, 
+      isAutoPayout: autoApprove && autoPayout,
       assignedTo: selectedChildId,
       familyId,
     };
 
     try {
+      setIsSavingTask(true);
       await upsertTaskMutation(
         { taskId: editingId, task: taskData },
         async () => {
@@ -165,31 +195,37 @@ const addTask = async (e: React.FormEvent) => {
       setEditingId(null);
 
       // СБРОС ФОРМЫ (Очищаем поля после успешного сохранения)
-      setNewLabel(''); 
-      setNewPoints(10); 
-      setNewIcon('📝'); 
+      setNewLabel('');
+      setNewPoints(10);
+      setNewIcon('📝');
       setNewDuration(0);
-      setAutoRepeat(false); 
-      setAutoApprove(false); 
+      setAutoRepeat(false);
+      setAutoApprove(false);
       setAutoPayout(false);
 
     } catch (error) {
       console.error("Ошибка при сохранении задачи:", error);
       alert(saveTaskErrorByLang[lang]);
+    } finally {
+      setIsSavingTask(false);
     }
   };
 
   const clearOldTasks = async () => {
-    if (!window.confirm(t.admin.clearConfirm)) return;
-    const tasksToDelete = tasks.filter(t => 
+    if (isClearingTasks || !window.confirm(t.admin.clearConfirm)) return;
+    const tasksToDelete = tasks.filter(t =>
       (t.assignedTo === selectedChildId || t.assignedTo === 'all') && !t.isAutoRepeat
     );
     try {
+      setIsClearingTasks(true);
       await clearTasksMutation(
         { selectedChildId },
         async () => Promise.all(tasksToDelete.map(task => deleteDoc(doc(db, "tasks_list", task.id)))),
       );
     } catch (err) { console.error(err); }
+    finally {
+      setIsClearingTasks(false);
+    }
   };
 
 return (
@@ -219,6 +255,11 @@ return (
             <h3 style={{ color: 'var(--accent-orange)', fontSize: '18px', marginBottom: '15px' }}>
               🔔 {t.admin.requests} ({currentChild?.name || '...'}) {/* ИСПРАВЛЕНО */}
             </h3>
+            {approvalError ? (
+              <div className={`${styles.formMessage} ${styles.formError}`} style={{ marginBottom: '15px' }}>
+                {approvalError}
+              </div>
+            ) : null}
             {scopedApprovals.filter(a => a.userId === selectedChildId).length === 0 ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-secondary)', background: 'rgba(255,255,255,0.02)', borderRadius: '24px', border: '1px dashed var(--border-color)' }}>
                 ☕ {t.admin.noRequests} {/* ИСПРАВЛЕНО */}
@@ -232,7 +273,16 @@ return (
                       {a.points > 0 ? `+${a.points}` : a.points}
                     </div>
                   </div>
-                  <button onClick={() => handleFinalApprove(a)} style={{ padding: '12px 20px', background: 'var(--accent-green)', color: 'white', border: 'none', borderRadius: '15px', fontWeight: 'bold' }}>OK</button>
+                  <button
+                    onClick={() => handleFinalApprove(a)}
+                    disabled={processingApprovalId === a.id}
+                    style={{ padding: '12px 20px', background: 'var(--accent-green)', color: 'white', border: 'none', borderRadius: '15px', fontWeight: 'bold', opacity: processingApprovalId === a.id ? 0.7 : 1, cursor: processingApprovalId === a.id ? 'wait' : 'pointer' }}
+                  >
+                    <span className={styles.busyButton}>
+                      {processingApprovalId === a.id ? <span className={styles.inlineSpinner} aria-hidden="true" /> : null}
+                      <span>{processingApprovalId === a.id ? busyText.syncing : 'OK'}</span>
+                    </span>
+                  </button>
                 </div>
               ))
             )}
@@ -242,18 +292,23 @@ return (
 
       {mode === 'edit' && (
         <div className={styles.leftCol}>
-          <AdminForm 
+          <AdminForm
             t={t}
+            lang={lang}
             currentChild={currentChild}
             onSubmit={addTask}
             editingId={editingId}
+            isSubmitting={isSavingTask}
             onCancel={() => setEditingId(null)}
             formState={{ newLabel, newPoints, newIcon, newDuration, autoRepeat, autoApprove, autoPayout }}
             setters={{ setNewLabel, setNewPoints, setNewIcon, setNewDuration, setAutoRepeat, setAutoApprove, setAutoPayout }}
           />
           <div style={{ marginTop: '30px' }}>
-            <button onClick={clearOldTasks} className={styles.clearButton} style={{ marginBottom: '20px', width: '100%' }}>
-              🗑️ {t.admin.clearOld} {/* ИСПРАВЛЕНО */}
+            <button onClick={clearOldTasks} className={styles.clearButton} style={{ marginBottom: '20px', width: '100%' }} disabled={isClearingTasks}>
+              <span className={styles.busyButton}>
+                {isClearingTasks ? <span className={styles.inlineSpinnerLight} aria-hidden="true" /> : null}
+                <span>{isClearingTasks ? busyText.clearing : `🗑️ ${t.admin.clearOld}`}</span>
+              </span>
             </button>
             <h4 style={{ color: 'var(--text-secondary)', fontSize: '11px', textTransform: 'uppercase', marginBottom: '15px' }}>
               📜 {t.admin.templates}: {/* ИСПРАВЛЕНО */}

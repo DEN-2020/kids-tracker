@@ -77,7 +77,7 @@ src/
    VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
    VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
    VITE_FIREBASE_APP_ID=your_app_id
-   VITE_USE_FIREBASE_FUNCTIONS=false
+   VITE_USE_FIREBASE_FUNCTIONS=true
 
 3. **Run Development Mode:**
    npm run dev
@@ -95,7 +95,7 @@ src/
 - `Verify` in GitHub uses safe placeholder Vite env values, so real frontend Firebase keys are not required just for CI build checks.
 - The deploy workflow is manual only; it does not run on every `push` to `main`.
 - Use the `deploy_functions` input only when Cloud Functions should be deployed too.
-- Before enabling server-side mutations in production, deploy functions and then set `VITE_USE_FIREBASE_FUNCTIONS=true` in the environment that builds your frontend.
+- Points, approvals, shop purchases, family-member edits, and achievement activation require deployed Firebase Functions; keep `VITE_USE_FIREBASE_FUNCTIONS=true` in local and production builds.
 - For local Functions work, install their dependencies once in `functions/` with `npm install`.
 
 ---

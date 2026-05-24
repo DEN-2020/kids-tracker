@@ -37,7 +37,7 @@ interface Approval {
 }
 
 interface TaskListProps {
-  userRole?: 'child' | 'parent'; 
+  userRole?: 'child' | 'parent';
   lang?: 'fi' | 'ru' | 'en';
   t: {
     inProgress: string;
@@ -47,37 +47,62 @@ interface TaskListProps {
   };
   availableTasks: Task[];
   myApprovals: Approval[];
-  runningTimer: { id: string; timeLeft: number } | null;
+  runningTimer: { taskId: string; timeLeft: number } | null;
   formatTime: (seconds: number) => string;
-  startTaskTimer: (approvalId: string, minutes: number) => void;
+  startTaskTimer: (taskId: string, minutes: number) => void;
   markAsDone: (approvalId: string) => Promise<void>;
   requestToStart: (task: Task) => Promise<void>;
 }
 
+type ParentConfirmAction =
+  | {
+      kind: 'task';
+      task: DisplayTask;
+    }
+  | {
+      kind: 'approval';
+      approval: Approval;
+    };
+
 const textByLang = {
   fi: {
     dayGoal: 'Päivän tavoite',
-    parentStartConfirm: 'Haluatko merkitä tämän tehdyksi?',
-    parentApproveConfirm: 'Hyväksytkö?',
+    parentTaskConfirmTitle: 'Merkitäänkö tehtävä tehdyksi?',
+    parentApprovalConfirmTitle: 'Hyväksytäänkö suoritus?',
     waiting: 'Odottaa...',
+    processing: 'Suoritetaan...',
+    syncing: 'Synkronoidaan pilveen...',
     hoursShort: 't',
     minutesShort: 'min',
+    timerHint: 'Ajastin',
+    cancel: 'Peruuta',
+    confirm: 'Vahvista',
   },
   ru: {
     dayGoal: 'Цель на день',
-    parentStartConfirm: 'Выполнить за ребенка?',
-    parentApproveConfirm: 'Подтвердить?',
+    parentTaskConfirmTitle: 'Отметить задачу выполненной?',
+    parentApprovalConfirmTitle: 'Подтвердить выполнение?',
     waiting: 'Ждем...',
+    processing: 'Выполняется...',
+    syncing: 'Синхронизация с облаком...',
     hoursShort: 'ч',
     minutesShort: 'м',
+    timerHint: 'Таймер',
+    cancel: 'Отмена',
+    confirm: 'Подтвердить',
   },
   en: {
     dayGoal: 'Daily goal',
-    parentStartConfirm: 'Mark this as done for the child?',
-    parentApproveConfirm: 'Approve this task?',
+    parentTaskConfirmTitle: 'Mark this task as done?',
+    parentApprovalConfirmTitle: 'Approve this completion?',
     waiting: 'Waiting...',
+    processing: 'Processing...',
+    syncing: 'Syncing with cloud...',
     hoursShort: 'h',
     minutesShort: 'm',
+    timerHint: 'Timer',
+    cancel: 'Cancel',
+    confirm: 'Confirm',
   },
 } as const;
 
@@ -93,8 +118,8 @@ const resolveTaskListLang = (
   return 'en';
 };
 
-export const TaskList: React.FC<TaskListProps> = ({ 
-  t, availableTasks, myApprovals, runningTimer, 
+export const TaskList: React.FC<TaskListProps> = ({
+  t, availableTasks, myApprovals, runningTimer,
   formatTime, startTaskTimer, markAsDone, requestToStart,
   userRole,
   lang,
@@ -108,7 +133,8 @@ export const TaskList: React.FC<TaskListProps> = ({
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [coins, setCoins] = useState<{id: number, left: string}[]>([]);
   const [holdId, setHoldId] = useState<string | null>(null);
-  
+  const [parentConfirmAction, setParentConfirmAction] = useState<ParentConfirmAction | null>(null);
+
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdSoundInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const uiText = textByLang[resolveTaskListLang(lang, t)];
@@ -151,16 +177,23 @@ export const TaskList: React.FC<TaskListProps> = ({
   const executeRequest = async (task: Task) => {
     stopHoldSound();
     setHoldId(null);
+    setParentConfirmAction(null);
     setApprovingId(task.id);
-    
+    const startedAt = Date.now();
+    const minimumProcessingMs = userRole === 'parent' ? 500 : 0;
+
     requestAnimationFrame(async () => {
       try {
         await requestToStart(task);
         spawnCoins();
-        playSound('coin'); 
+        playSound('coin');
       } catch {
         console.error("Execute error");
       } finally {
+        const elapsedMs = Date.now() - startedAt;
+        if (minimumProcessingMs > elapsedMs) {
+          await new Promise((resolve) => window.setTimeout(resolve, minimumProcessingMs - elapsedMs));
+        }
         setApprovingId(null);
       }
     });
@@ -171,10 +204,7 @@ export const TaskList: React.FC<TaskListProps> = ({
     if (hasActiveRequest || task.isDone || task.isInWork || task.isPending || approvingId === task.id || holdId === task.id) return;
 
     if (userRole === 'parent') {
-      Promise.resolve().then(() => {
-        const confirmAction = window.confirm(uiText.parentStartConfirm);
-        if (confirmAction) executeRequest(task);
-      });
+      setParentConfirmAction({ kind: 'task', task });
       return;
     }
 
@@ -195,49 +225,42 @@ export const TaskList: React.FC<TaskListProps> = ({
     setHoldId(null);
   };
 
-  const handleDoneClick = async (e: React.MouseEvent, approvalId: string) => {
-    e.stopPropagation();
-    if (approvingId === approvalId) return;
+  const settleApproval = async (approval: Approval) => {
+    if (approvingId === approval.id) return;
 
-    if (userRole === 'parent') {
-      Promise.resolve().then(async () => {
-        const confirmAction = window.confirm(uiText.parentApproveConfirm);
-        if (!confirmAction) return;
-
-        setApprovingId(approvalId); 
-        try {
-          await markAsDone(approvalId);
-          spawnCoins();
-          playSound('success'); 
-        } catch {
-          console.error("Confirm error");
-        } finally {
-          setApprovingId(null);
-        }
-      });
-      return;
-    }
-    
-    setApprovingId(approvalId); 
+    setParentConfirmAction(null);
+    setApprovingId(approval.id);
     try {
-      await markAsDone(approvalId);
+      await markAsDone(approval.id);
       spawnCoins();
-      playSound('success'); 
+      playSound('success');
     } catch {
       setApprovingId(null);
     }
+  };
+
+  const handleDoneClick = async (e: React.MouseEvent, approval: Approval) => {
+    e.stopPropagation();
+    if (approvingId === approval.id) return;
+
+    if (userRole === 'parent') {
+      setParentConfirmAction({ kind: 'approval', approval });
+      return;
+    }
+
+    await settleApproval(approval);
   };
 
   // --- ВЫЧИСЛЕНИЯ ---
   const allTasksForToday: DisplayTask[] = availableTasks.map(task => {
     const approval = myApprovals.find(a => a.taskId === task.id);
     const isDone = isRecordedToday(task.lastCompleted, task.lastCompletedAt) || approval?.status === 'completed';
-    
-    return { 
-      ...task, 
-      isDone, 
-      isInWork: approval?.status === 'in_progress', 
-      isPending: approval?.status === 'pending' 
+
+    return {
+      ...task,
+      isDone,
+      isInWork: approval?.status === 'in_progress',
+      isPending: approval?.status === 'pending'
     };
   });
 
@@ -259,10 +282,75 @@ export const TaskList: React.FC<TaskListProps> = ({
     };
   };
   const deadline = getDeadlineInfo();
+  const formatDuration = (minutes?: number) => {
+    if (!minutes || minutes <= 0) return null;
+    return `${minutes}${uiText.minutesShort}`;
+  };
+  const confirmIcon = parentConfirmAction?.kind === 'task'
+    ? parentConfirmAction.task.icon || '📝'
+    : parentConfirmAction?.approval.label ? '✅' : '📝';
+  const confirmLabel = parentConfirmAction?.kind === 'task'
+    ? parentConfirmAction.task.label
+    : parentConfirmAction?.approval.label || '';
+  const confirmPoints = parentConfirmAction?.kind === 'task'
+    ? parentConfirmAction.task.points
+    : parentConfirmAction?.approval.points || 0;
+  const confirmTitle = parentConfirmAction?.kind === 'task'
+    ? uiText.parentTaskConfirmTitle
+    : uiText.parentApprovalConfirmTitle;
+  const confirmBusy = !!parentConfirmAction && (
+    parentConfirmAction.kind === 'task'
+      ? approvingId === parentConfirmAction.task.id
+      : approvingId === parentConfirmAction.approval.id
+  );
+
+  const confirmParentAction = async () => {
+    const action = parentConfirmAction;
+    if (!action) return;
+
+    if (action.kind === 'task') {
+      await executeRequest(action.task);
+      return;
+    }
+
+    await settleApproval(action.approval);
+  };
 
   return (
     <>
       {coins.map(c => <div key={c.id} className={styles.coin} style={{ left: c.left }}>💰</div>)}
+
+      {parentConfirmAction && (
+        <div className={styles.confirmOverlay} onClick={() => {
+          if (confirmBusy) return;
+          setParentConfirmAction(null);
+        }}>
+          <div className={styles.confirmSheet} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.confirmIcon}>{confirmIcon}</div>
+            <div className={styles.confirmTitle}>{confirmTitle}</div>
+            <div className={styles.confirmLabel}>{confirmLabel}</div>
+            <div className={styles.confirmPoints}>+{confirmPoints}</div>
+            <div className={styles.confirmActions}>
+              <button type="button" className={styles.confirmCancelBtn} onClick={() => setParentConfirmAction(null)} disabled={confirmBusy}>
+                {uiText.cancel}
+              </button>
+              <button type="button" className={styles.confirmOkBtn} onClick={() => void confirmParentAction()} disabled={confirmBusy}>
+                <span className={styles.confirmBtnContent}>
+                  {confirmBusy ? <span className={styles.inlineSpinner} aria-hidden="true" /> : null}
+                  <span>{confirmBusy ? uiText.syncing : uiText.confirm}</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {approvingId ? (
+        <div className={styles.syncBanner}>
+          <span className={styles.inlineSpinnerLight} aria-hidden="true" />
+          <span>{uiText.syncing}</span>
+        </div>
+      ) : null}
 
       <div className={styles.statsCard}>
         <div className={styles.statsInfo}>
@@ -279,23 +367,34 @@ export const TaskList: React.FC<TaskListProps> = ({
         {myApprovals.filter(a => a.status === 'in_progress').map(a => {
           const isProcessing = approvingId === a.id;
           const taskInfo = availableTasks.find(task => task.id === a.taskId);
+          const timerIsRunning = runningTimer?.taskId === a.taskId;
+          const runningTimerText = timerIsRunning && runningTimer
+            ? formatTime(runningTimer.timeLeft)
+            : null;
           return (
             <div key={a.id} className={`${styles.activeTaskCard} ${isProcessing ? 'task-approving' : ''}`}>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontWeight: 'bold' }}>{isProcessing ? '🚀...' : a.label}</span>
-                {runningTimer?.id === a.id && <span style={{ color: 'var(--accent-blue)', fontWeight: 'bold' }}>⏱️ {formatTime(runningTimer.timeLeft)}</span>}
+                {runningTimerText && <span style={{ color: 'var(--accent-blue)', fontWeight: 'bold' }}>⏱️ {runningTimerText}</span>}
               </div>
               <div style={{ display: 'flex', gap: '10px' }}>
-                {!isProcessing && !runningTimer && taskInfo?.duration && (
-                  <button onClick={() => startTaskTimer(a.id, taskInfo.duration!)} style={{ padding: '10px', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: '12px' }}>▶️</button>
+                {!isProcessing && taskInfo?.duration && (
+                  <button onClick={() => startTaskTimer(taskInfo.id, taskInfo.duration!)} style={{ padding: '10px', background: 'var(--accent-blue)', color: 'white', border: 'none', borderRadius: '12px' }}>
+                    {timerIsRunning ? '⏱️' : '▶️'}
+                  </button>
                 )}
-                <button 
-                  onClick={(e) => handleDoneClick(e, a.id)} 
-                  disabled={isProcessing} 
+                <button
+                  onClick={(e) => void handleDoneClick(e, a)}
+                  disabled={isProcessing}
                   className="payout-btn"
                   style={{ zIndex: 999, position: 'relative', cursor: 'pointer' }}
                 >
-                  {isProcessing ? '⏳' : t.done}
+                  {isProcessing ? (
+                    <span className={styles.confirmBtnContent}>
+                      <span className={styles.inlineSpinner} aria-hidden="true" />
+                      <span>{uiText.processing}</span>
+                    </span>
+                  ) : t.done}
                 </button>
               </div>
             </div>
@@ -306,17 +405,27 @@ export const TaskList: React.FC<TaskListProps> = ({
       <h3 style={{ color: 'var(--accent-blue)', marginBottom: '15px' }}>{t.availableTasks}</h3>
       <div className={styles.tasksGrid}>
         {allTasksForToday.map(task => {
-          if (task.isDone || task.isInWork || approvingId === task.id) return null;
-          const isWaiting = task.isPending || myApprovals.some(a => a.taskId === task.id);
+          if (task.isDone || task.isInWork) return null;
+          const isProcessing = approvingId === task.id;
+          const isWaiting = !isProcessing && (task.isPending || myApprovals.some(a => a.taskId === task.id));
+          const taskDuration = task.duration;
+          const taskTimerText = runningTimer?.taskId === task.id && runningTimer
+            ? formatTime(runningTimer.timeLeft)
+            : formatDuration(taskDuration);
 
           return (
-            <TaskItem 
+            <TaskItem
               key={task.id}
               task={task}
               isWaiting={isWaiting}
               isHolding={holdId === task.id}
+              isProcessing={isProcessing}
               deadlineText={deadline.text}
+              timerText={taskTimerText}
+              timerLabel={uiText.timerHint}
+              processingLabel={uiText.processing}
               waitingLabel={uiText.waiting}
+              onTimerClick={typeof taskDuration === 'number' ? () => startTaskTimer(task.id, taskDuration) : undefined}
               onStart={() => startHolding(task)}
               onStop={stopHolding}
             />

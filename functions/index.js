@@ -26,6 +26,82 @@ const sanitizeOptionalString = (value) => {
   return normalized || null;
 };
 
+const normalizeApprovalStatus = (value, allowedStatuses = ['pending']) => {
+  const status = normalizeString(value) || allowedStatuses[0];
+  if (!allowedStatuses.includes(status)) {
+    throw new HttpsError('invalid-argument', 'Unsupported approval status.');
+  }
+
+  return status;
+};
+
+const isTaskAssignedToUser = (task, userId) => {
+  const assignedTo = normalizeString(task?.assignedTo) || 'all';
+  return assignedTo === 'all' || assignedTo === userId;
+};
+
+const assertTaskAssignedToUser = (task, userId) => {
+  if (!isTaskAssignedToUser(task, userId)) {
+    throw new HttpsError('permission-denied', 'Task is not assigned to this user.');
+  }
+};
+
+const buildTaskApproval = ({ familyId, requestedUserId, status, task, taskId }) => {
+  const label = normalizeString(task?.label);
+  const points = Math.abs(Number(task?.points) || 0);
+
+  if (!label) {
+    throw new HttpsError('failed-precondition', 'Task label is missing.');
+  }
+
+  if (!points) {
+    throw new HttpsError('failed-precondition', 'Task points must be greater than zero.');
+  }
+
+  return {
+    approvalType: 'task',
+    createdAt: new Date().toISOString(),
+    familyId,
+    icon: sanitizeOptionalString(task?.icon) || '📝',
+    label,
+    points,
+    status,
+    taskId,
+    userId: requestedUserId,
+  };
+};
+
+const buildPurchaseApproval = ({ familyId, item, itemId, requestedUserId }) => {
+  const itemType = normalizeString(item?.type);
+  const sanitizedLabel = normalizeString(item?.label);
+  const negativePoints = -Math.abs(Number(item?.threshold) || 0);
+
+  if (!['reward', 'exchange'].includes(itemType)) {
+    throw new HttpsError('invalid-argument', 'Only reward and exchange items can be purchased.');
+  }
+
+  if (!sanitizedLabel) {
+    throw new HttpsError('invalid-argument', 'Approval label is required.');
+  }
+
+  if (!negativePoints) {
+    throw new HttpsError('invalid-argument', 'Purchase points must be less than zero.');
+  }
+
+  return {
+    approvalType: 'purchase',
+    createdAt: new Date().toISOString(),
+    familyId,
+    icon: sanitizeOptionalString(item?.icon) || '🛍️',
+    itemId,
+    label: sanitizedLabel,
+    points: negativePoints,
+    status: 'pending',
+    taskId: null,
+    userId: requestedUserId,
+  };
+};
+
 const assertAuth = (auth) => {
   if (!auth?.uid) {
     throw new HttpsError('unauthenticated', 'Authentication is required.');
@@ -76,6 +152,18 @@ const getFamilyExists = async (familyId) => {
 const generateFamilyId = (uid) =>
   `fam_${uid.slice(0, 5)}_${Math.random().toString(36).slice(2, 7)}`;
 
+const getPendingPurchaseReservation = (snapshot) =>
+  snapshot.docs.reduce((sum, approvalDoc) => {
+    const approvalData = approvalDoc.data();
+    if (approvalData.approvalType !== 'purchase' || approvalData.status !== 'pending') {
+      return sum;
+    }
+
+    return sum + Math.abs(Number(approvalData.points) || 0);
+  }, 0);
+
+const isCompletedToday = (task) => normalizeString(task?.lastCompleted) === getLocalDayKey();
+
 const mapTaskPayload = (task, familyId) => {
   const label = normalizeString(task?.label);
   if (!label) {
@@ -83,8 +171,8 @@ const mapTaskPayload = (task, familyId) => {
   }
 
   const points = Number(task?.points);
-  if (!Number.isFinite(points)) {
-    throw new HttpsError('invalid-argument', 'Task points must be a number.');
+  if (!Number.isFinite(points) || points <= 0) {
+    throw new HttpsError('invalid-argument', 'Task points must be greater than zero.');
   }
 
   const assignedTo = normalizeString(task?.assignedTo) || 'all';
@@ -96,7 +184,7 @@ const mapTaskPayload = (task, familyId) => {
     familyId,
     icon: sanitizeOptionalString(task?.icon) || '📝',
     isAutoApprove: Boolean(task?.isAutoApprove),
-    isAutoPayout: Boolean(task?.isAutoPayout),
+    isAutoPayout: Boolean(task?.isAutoApprove) && Boolean(task?.isAutoPayout),
     isAutoRepeat: Boolean(task?.isAutoRepeat),
     label,
     points,
@@ -115,8 +203,8 @@ const mapCatalogPayload = (item, familyId) => {
   }
 
   const threshold = Number(item?.threshold);
-  if (!Number.isFinite(threshold)) {
-    throw new HttpsError('invalid-argument', 'Catalog threshold must be numeric.');
+  if (!Number.isFinite(threshold) || threshold <= 0) {
+    throw new HttpsError('invalid-argument', 'Catalog threshold must be greater than zero.');
   }
 
   const payload = {
@@ -162,6 +250,13 @@ export const registerProfile = onCall(async (request) => {
     const familyExists = await getFamilyExists(incomingFamilyId);
     if (!familyExists) {
       throw new HttpsError('not-found', 'Family was not found.');
+    }
+
+    if (role !== 'child') {
+      throw new HttpsError(
+        'failed-precondition',
+        'Only child profiles can join an existing family via invite code.',
+      );
     }
   }
 
@@ -210,7 +305,21 @@ export const deleteTask = onCall(async (request) => {
   }
 
   const task = await requireSameFamilyDocument(COLLECTIONS.tasks, taskId, profile.familyId);
-  await task.ref.delete();
+  const approvalsSnapshot = await db
+    .collection(COLLECTIONS.approvals)
+    .where('familyId', '==', profile.familyId)
+    .get();
+
+  const batch = db.batch();
+  batch.delete(task.ref);
+
+  approvalsSnapshot.docs.forEach((approvalSnapshot) => {
+    if (approvalSnapshot.data().taskId === taskId) {
+      batch.delete(approvalSnapshot.ref);
+    }
+  });
+
+  await batch.commit();
 
   return { ok: true };
 });
@@ -229,9 +338,14 @@ export const clearTasks = onCall(async (request) => {
     .collection(COLLECTIONS.tasks)
     .where('familyId', '==', profile.familyId)
     .get();
+  const approvalsSnapshot = await db
+    .collection(COLLECTIONS.approvals)
+    .where('familyId', '==', profile.familyId)
+    .get();
 
   const batch = db.batch();
   let deletedCount = 0;
+  const deletedTaskIds = new Set();
 
   snapshot.docs.forEach((taskSnapshot) => {
     const task = taskSnapshot.data();
@@ -239,6 +353,13 @@ export const clearTasks = onCall(async (request) => {
     if (belongsToChild && !task.isAutoRepeat) {
       batch.delete(taskSnapshot.ref);
       deletedCount += 1;
+      deletedTaskIds.add(taskSnapshot.id);
+    }
+  });
+
+  approvalsSnapshot.docs.forEach((approvalSnapshot) => {
+    if (deletedTaskIds.has(approvalSnapshot.data().taskId)) {
+      batch.delete(approvalSnapshot.ref);
     }
   });
 
@@ -253,41 +374,86 @@ export const submitApproval = onCall(async (request) => {
   const uid = assertAuth(request.auth);
   const profile = await requireProfile(uid);
 
-  const label = normalizeString(request.data?.label);
-  const points = Number(request.data?.points);
-  const status = normalizeString(request.data?.status) || 'pending';
-  const icon = sanitizeOptionalString(request.data?.icon) || '📝';
   const taskId = sanitizeOptionalString(request.data?.taskId);
   const requestedUserId = normalizeString(request.data?.userId) || uid;
-
-  if (!label) {
-    throw new HttpsError('invalid-argument', 'Approval label is required.');
-  }
-
-  if (!Number.isFinite(points)) {
-    throw new HttpsError('invalid-argument', 'Approval points must be numeric.');
-  }
-
-  if (!['pending', 'in_progress'].includes(status)) {
-    throw new HttpsError('invalid-argument', 'Unsupported approval status.');
-  }
 
   if (requestedUserId !== uid) {
     assertRole(profile, 'parent');
   }
 
   await requireSameFamilyDocument(COLLECTIONS.users, requestedUserId, profile.familyId);
+  let approval;
 
-  const approval = {
-    createdAt: new Date().toISOString(),
-    familyId: profile.familyId,
-    icon,
-    label,
-    points,
-    status,
-    taskId,
-    userId: requestedUserId,
-  };
+  if (taskId) {
+    const status = normalizeApprovalStatus(request.data?.status, ['pending', 'in_progress']);
+    if (status === 'in_progress' && profile.role !== 'parent') {
+      throw new HttpsError('permission-denied', 'Only a parent can start an in-progress approval.');
+    }
+
+    const task = await requireSameFamilyDocument(COLLECTIONS.tasks, taskId, profile.familyId);
+    assertTaskAssignedToUser(task, requestedUserId);
+
+    approval = buildTaskApproval({
+      familyId: profile.familyId,
+      requestedUserId,
+      status,
+      task,
+      taskId,
+    });
+  } else {
+    normalizeApprovalStatus(request.data?.status, ['pending']);
+    const itemId = normalizeString(request.data?.itemId);
+    if (!itemId) {
+      throw new HttpsError('invalid-argument', 'Catalog item id is required.');
+    }
+
+    const item = await requireSameFamilyDocument(COLLECTIONS.catalog, itemId, profile.familyId);
+    approval = buildPurchaseApproval({
+      familyId: profile.familyId,
+      item,
+      itemId,
+      requestedUserId,
+    });
+
+    const approvalRef = db.collection(COLLECTIONS.approvals).doc();
+    const approvalsQuery = db
+      .collection(COLLECTIONS.approvals)
+      .where('familyId', '==', profile.familyId)
+      .where('userId', '==', requestedUserId);
+    const targetUserRef = db.collection(COLLECTIONS.users).doc(requestedUserId);
+    const requestedCost = Math.abs(Number(approval.points) || 0);
+
+    await db.runTransaction(async (transaction) => {
+      const [targetUserSnapshot, approvalsSnapshot] = await Promise.all([
+        transaction.get(targetUserRef),
+        transaction.get(approvalsQuery),
+      ]);
+
+      if (!targetUserSnapshot.exists) {
+        throw new HttpsError('failed-precondition', 'User profile was not found.');
+      }
+
+      const targetUser = targetUserSnapshot.data();
+      if (targetUser.familyId !== profile.familyId) {
+        throw new HttpsError('permission-denied', 'Cross-family access is forbidden.');
+      }
+
+      const currentBalance = Number(targetUser.currentBalance) || 0;
+      const reservedBalance = getPendingPurchaseReservation(approvalsSnapshot);
+      const availableBalance = currentBalance - reservedBalance;
+
+      if (availableBalance < requestedCost) {
+        throw new HttpsError(
+          'failed-precondition',
+          'Not enough available balance for this purchase request.',
+        );
+      }
+
+      transaction.set(approvalRef, approval);
+    });
+
+    return { id: approvalRef.id, ...approval };
+  }
 
   const docRef = await db.collection(COLLECTIONS.approvals).add(approval);
   return { id: docRef.id, ...approval };
@@ -305,56 +471,140 @@ export const settleApproval = onCall(async (request) => {
   const approval = await requireSameFamilyDocument(COLLECTIONS.approvals, approvalId, profile.familyId);
   const isParent = profile.role === 'parent';
   const canSettleOwnProgress =
-    approval.userId === uid && approval.status === 'in_progress' && Number(approval.points) > 0;
+    approval.approvalType === 'task' &&
+    approval.userId === uid &&
+    approval.status === 'in_progress' &&
+    Boolean(approval.taskId);
 
   if (!isParent && !canSettleOwnProgress) {
     throw new HttpsError('permission-denied', 'You are not allowed to settle this approval.');
   }
 
   const targetUser = await requireSameFamilyDocument(COLLECTIONS.users, approval.userId, profile.familyId);
-  const task = approval.taskId
-    ? await requireSameFamilyDocument(COLLECTIONS.tasks, approval.taskId, profile.familyId).catch(() => null)
-    : null;
+  const isTaskApproval = approval.approvalType === 'task' || Boolean(approval.taskId);
+  const taskPoints = Math.abs(Number(approval.points) || 0);
+  const purchasePoints = Number(approval.points) || 0;
+  const isPurchase = !isTaskApproval;
+  const historyLabel = normalizeString(approval.label) || (isPurchase ? 'Purchase Approved' : 'Task Completed');
 
-  const pointsValue = Number(approval.points) || 0;
-  const isPurchase = pointsValue < 0;
-  const balanceDelta = isPurchase ? -Math.abs(pointsValue) : Math.abs(pointsValue);
-  const batch = db.batch();
+  if (!(isPurchase ? Math.abs(purchasePoints) : taskPoints)) {
+    throw new HttpsError(
+      'failed-precondition',
+      isPurchase ? 'Purchase approval has invalid points.' : 'Task approval has invalid points.',
+    );
+  }
 
   if (isPurchase) {
-    batch.update(targetUser.ref, {
-      currentBalance: FieldValue.increment(balanceDelta),
-    });
-  } else {
-    batch.update(targetUser.ref, {
-      currentBalance: FieldValue.increment(balanceDelta),
-      totalPoints: FieldValue.increment(balanceDelta),
-    });
-  }
+    const approvalRef = approval.ref;
+    const purchaseCost = Math.abs(purchasePoints);
 
-  const historyRef = db.collection(COLLECTIONS.history).doc();
-  batch.set(historyRef, {
-    date: new Date(),
-    familyId: profile.familyId,
-    label: approval.label,
-    points: balanceDelta,
-    type: isPurchase ? 'spend' : 'earn',
-    userId: approval.userId,
-  });
+    await db.runTransaction(async (transaction) => {
+      const [approvalSnapshot, targetUserSnapshot] = await Promise.all([
+        transaction.get(approvalRef),
+        transaction.get(targetUser.ref),
+      ]);
 
-  if (task) {
-    if (task.isAutoRepeat) {
-      batch.update(task.ref, {
-        lastCompleted: getLocalDayKey(),
-        lastCompletedAt: new Date(),
+      if (!approvalSnapshot.exists) {
+        throw new HttpsError('not-found', 'Approval was not found.');
+      }
+
+      if (!targetUserSnapshot.exists) {
+        throw new HttpsError('failed-precondition', 'User profile was not found.');
+      }
+
+      const approvalData = approvalSnapshot.data();
+      const targetUserData = targetUserSnapshot.data();
+
+      if (approvalData.familyId !== profile.familyId || targetUserData.familyId !== profile.familyId) {
+        throw new HttpsError('permission-denied', 'Cross-family access is forbidden.');
+      }
+
+      const currentBalance = Number(targetUserData.currentBalance) || 0;
+      if (currentBalance < purchaseCost) {
+        throw new HttpsError('failed-precondition', 'Not enough balance to approve this purchase.');
+      }
+
+      transaction.update(targetUser.ref, {
+        currentBalance: currentBalance - purchaseCost,
       });
-    } else {
-      batch.delete(task.ref);
-    }
+      transaction.set(db.collection(COLLECTIONS.history).doc(), {
+        date: new Date(),
+        familyId: profile.familyId,
+        label: historyLabel,
+        points: -purchaseCost,
+        type: 'spend',
+        userId: approval.userId,
+      });
+      transaction.delete(approvalRef);
+    });
+
+    return { ok: true };
   }
 
-  batch.delete(approval.ref);
-  await batch.commit();
+  await db.runTransaction(async (transaction) => {
+    const [approvalSnapshot, targetUserSnapshot] = await Promise.all([
+      transaction.get(approval.ref),
+      transaction.get(targetUser.ref),
+    ]);
+
+    if (!approvalSnapshot.exists) {
+      throw new HttpsError('not-found', 'Approval was not found.');
+    }
+
+    if (!targetUserSnapshot.exists) {
+      throw new HttpsError('failed-precondition', 'User profile was not found.');
+    }
+
+    const approvalData = approvalSnapshot.data();
+    const targetUserData = targetUserSnapshot.data();
+
+    if (approvalData.familyId !== profile.familyId || targetUserData.familyId !== profile.familyId) {
+      throw new HttpsError('permission-denied', 'Cross-family access is forbidden.');
+    }
+
+    const currentBalance = Number(targetUserData.currentBalance) || 0;
+    const totalPoints = Number(targetUserData.totalPoints) || 0;
+    const taskRef = approval.taskId ? db.collection(COLLECTIONS.tasks).doc(approval.taskId) : null;
+    const taskSnapshot = taskRef ? await transaction.get(taskRef) : null;
+    const taskData = taskSnapshot?.exists ? taskSnapshot.data() : null;
+
+    if (taskData) {
+      if (taskData.familyId !== profile.familyId) {
+        throw new HttpsError('permission-denied', 'Cross-family access is forbidden.');
+      }
+
+      assertTaskAssignedToUser(taskData, approval.userId);
+      if (Boolean(taskData.isAutoRepeat) && isCompletedToday(taskData)) {
+        throw new HttpsError('failed-precondition', 'Task is already completed today.');
+      }
+    }
+
+    transaction.update(targetUser.ref, {
+      currentBalance: currentBalance + taskPoints,
+      totalPoints: totalPoints + taskPoints,
+    });
+    transaction.set(db.collection(COLLECTIONS.history).doc(), {
+      date: new Date(),
+      familyId: profile.familyId,
+      label: historyLabel,
+      points: taskPoints,
+      type: 'earn',
+      userId: approval.userId,
+    });
+
+    if (taskSnapshot?.exists && taskData) {
+      if (taskData.isAutoRepeat) {
+        transaction.update(taskSnapshot.ref, {
+          lastCompleted: getLocalDayKey(),
+          lastCompletedAt: new Date(),
+        });
+      } else {
+        transaction.delete(taskSnapshot.ref);
+      }
+    }
+
+    transaction.delete(approval.ref);
+  });
 
   return { ok: true };
 });
@@ -365,15 +615,9 @@ export const completeTaskDirect = onCall(async (request) => {
 
   const taskId = normalizeString(request.data?.taskId);
   const userId = normalizeString(request.data?.userId) || uid;
-  const pointsValue = Math.abs(Number(request.data?.points) || 0);
-  const label = normalizeString(request.data?.label) || 'Task Completed';
 
   if (!taskId) {
     throw new HttpsError('invalid-argument', 'Task id is required.');
-  }
-
-  if (!pointsValue) {
-    throw new HttpsError('invalid-argument', 'Task points must be greater than zero.');
   }
 
   if (profile.role !== 'parent' && userId !== uid) {
@@ -382,32 +626,70 @@ export const completeTaskDirect = onCall(async (request) => {
 
   const targetUser = await requireSameFamilyDocument(COLLECTIONS.users, userId, profile.familyId);
   const task = await requireSameFamilyDocument(COLLECTIONS.tasks, taskId, profile.familyId);
-  const batch = db.batch();
+  const pointsValue = Math.abs(Number(task.points) || 0);
+  const label = normalizeString(task.label) || 'Task Completed';
 
-  batch.update(targetUser.ref, {
-    currentBalance: FieldValue.increment(pointsValue),
-    totalPoints: FieldValue.increment(pointsValue),
-  });
+  assertTaskAssignedToUser(task, userId);
 
-  batch.set(db.collection(COLLECTIONS.history).doc(), {
-    date: new Date(),
-    familyId: profile.familyId,
-    label,
-    points: pointsValue,
-    type: 'earn',
-    userId,
-  });
-
-  if (task.isAutoRepeat) {
-    batch.update(task.ref, {
-      lastCompleted: getLocalDayKey(),
-      lastCompletedAt: new Date(),
-    });
-  } else {
-    batch.delete(task.ref);
+  if (!pointsValue) {
+    throw new HttpsError('failed-precondition', 'Task points must be greater than zero.');
   }
 
-  await batch.commit();
+  if (profile.role !== 'parent' && !task.isAutoApprove) {
+    throw new HttpsError(
+      'permission-denied',
+      'Child can only directly complete tasks that are marked as auto-approved.',
+    );
+  }
+
+  await db.runTransaction(async (transaction) => {
+    const [targetUserSnapshot, taskSnapshot] = await Promise.all([
+      transaction.get(targetUser.ref),
+      transaction.get(task.ref),
+    ]);
+
+    if (!targetUserSnapshot.exists || !taskSnapshot.exists) {
+      throw new HttpsError('failed-precondition', 'Task or user profile was not found.');
+    }
+
+    const targetUserData = targetUserSnapshot.data();
+    const taskData = taskSnapshot.data();
+
+    if (targetUserData.familyId !== profile.familyId || taskData.familyId !== profile.familyId) {
+      throw new HttpsError('permission-denied', 'Cross-family access is forbidden.');
+    }
+
+    assertTaskAssignedToUser(taskData, userId);
+
+    if (Boolean(taskData.isAutoRepeat) && isCompletedToday(taskData)) {
+      throw new HttpsError('failed-precondition', 'Task is already completed today.');
+    }
+
+    const currentBalance = Number(targetUserData.currentBalance) || 0;
+    const totalPoints = Number(targetUserData.totalPoints) || 0;
+
+    transaction.update(targetUser.ref, {
+      currentBalance: currentBalance + pointsValue,
+      totalPoints: totalPoints + pointsValue,
+    });
+    transaction.set(db.collection(COLLECTIONS.history).doc(), {
+      date: new Date(),
+      familyId: profile.familyId,
+      label,
+      points: pointsValue,
+      type: 'earn',
+      userId,
+    });
+
+    if (taskData.isAutoRepeat) {
+      transaction.update(taskSnapshot.ref, {
+        lastCompleted: getLocalDayKey(),
+        lastCompletedAt: new Date(),
+      });
+    } else {
+      transaction.delete(taskSnapshot.ref);
+    }
+  });
 
   return { ok: true };
 });
@@ -421,8 +703,20 @@ export const upsertCatalogItem = onCall(async (request) => {
   const itemPayload = mapCatalogPayload(request.data?.item, profile.familyId);
 
   if (itemId) {
-    const existingItem = await requireSameFamilyDocument(COLLECTIONS.catalog, itemId, profile.familyId);
-    await existingItem.ref.set(itemPayload, { merge: true });
+    const itemRef = db.collection(COLLECTIONS.catalog).doc(itemId);
+    const existingSnapshot = await itemRef.get();
+
+    if (existingSnapshot.exists) {
+      const existingItem = existingSnapshot.data();
+      if (existingItem.familyId !== profile.familyId) {
+        throw new HttpsError('permission-denied', 'Cross-family access is forbidden.');
+      }
+
+      await itemRef.set(itemPayload, { merge: true });
+      return { id: itemId, ...itemPayload };
+    }
+
+    await itemRef.set(itemPayload);
     return { id: itemId, ...itemPayload };
   }
 

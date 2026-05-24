@@ -36,21 +36,26 @@ export const RegisterPage = ({ googleUid, initialName, initialAvatar, onSuccess,
   const [familyCode, setFamilyCode] = useState(() => joinFamilyCode);
   const [familyCodeError, setFamilyCodeError] = useState('');
   const isJoinFlow = Boolean(joinFamilyCode);
+  const existingFamilyId = normalizeFamilyId(familyCode);
+  const joiningExistingFamily = Boolean(existingFamilyId);
 
   const uiText = {
     en: {
       familyCodeInvalid: 'Family code was not found. Check the invite link or family code.',
       familyCodeLocked: 'Family code came from the invite link and cannot be changed here.',
+      parentJoinDisabled: 'Existing family codes can only be used for child profiles.',
       saveError: 'Error saving profile',
     },
     fi: {
       familyCodeInvalid: 'Perhekoodia ei loytynyt. Tarkista kutsulinkki tai perhekoodi.',
       familyCodeLocked: 'Perhekoodi tuli kutsulinkista, eika sita voi muuttaa tassa.',
+      parentJoinDisabled: 'Olemassa olevan perhekoodin kautta voi liittya vain lapsiprofiilina.',
       saveError: 'Profiilin tallennus epaonnistui',
     },
     ru: {
       familyCodeInvalid: 'Семейный код не найден. Проверьте ссылку приглашения или код семьи.',
       familyCodeLocked: 'Семейный код получен из ссылки-приглашения и не редактируется.',
+      parentJoinDisabled: 'По коду существующей семьи можно присоединиться только как ребёнок.',
       saveError: 'Не удалось сохранить профиль',
     },
   }[lang];
@@ -58,6 +63,13 @@ export const RegisterPage = ({ googleUid, initialName, initialAvatar, onSuccess,
   useEffect(() => {
     if (initialName && !name) setName(initialName);
   }, [initialName, name]);
+
+  useEffect(() => {
+    if (joiningExistingFamily && role === 'parent') {
+      setRole('child');
+      setAvatar(initialAvatar || '👶');
+    }
+  }, [initialAvatar, joiningExistingFamily, role]);
 
   const handleRegister = async (e?: FormEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
@@ -67,8 +79,12 @@ export const RegisterPage = ({ googleUid, initialName, initialAvatar, onSuccess,
       return;
     }
 
-    const existingFamilyId = normalizeFamilyId(familyCode);
     setFamilyCodeError('');
+    if (existingFamilyId && role === 'parent') {
+      setFamilyCodeError(uiText.parentJoinDisabled);
+      return;
+    }
+
     setLoading(true);
     try {
       if (existingFamilyId) {
@@ -137,12 +153,18 @@ export const RegisterPage = ({ googleUid, initialName, initialAvatar, onSuccess,
         
         <div 
           className={`${s.roleCard} ${role === 'parent' ? s.roleCardActive : ''}`}
-          onClick={() => { setRole('parent'); setAvatar('🧔'); }}
+          onClick={() => {
+            if (joiningExistingFamily) return;
+            setRole('parent');
+            setAvatar('🧔');
+          }}
+          style={joiningExistingFamily ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
         >
           <div className={s.roleEmoji}>🧔</div>
           <div className={s.roleLabel}>{t.auth.roleParent}</div>
         </div>
       </div>
+      {joiningExistingFamily ? <p className={s.hint}>{uiText.parentJoinDisabled}</p> : null}
 
       <div className={s.inputGroup}>
         <label htmlFor="family-code" className={s.label}>{t.auth.familyCodeLabel}</label>

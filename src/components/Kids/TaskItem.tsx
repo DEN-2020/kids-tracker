@@ -10,15 +10,23 @@ interface Task {
   isPending?: boolean;
   isInWork?: boolean;
   assignedTo?: string; 
-  duration?: number;   
+  duration?: number;
+  isAutoRepeat?: boolean;
+  isAutoApprove?: boolean;
+  isAutoPayout?: boolean;
 }
 
 interface TaskItemProps {
   task: Task;
   isWaiting: boolean;
   isHolding: boolean;
+  isProcessing: boolean;
   deadlineText: string;
+  timerText?: string | null;
+  timerLabel: string;
+  processingLabel: string;
   waitingLabel: string;
+  onTimerClick?: () => void;
   onStart: () => void;
   onStop: () => void;
 }
@@ -27,11 +35,22 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   task, 
   isWaiting, 
   isHolding, 
+  isProcessing,
   deadlineText, 
+  timerText,
+  timerLabel,
+  processingLabel,
   waitingLabel,
+  onTimerClick,
   onStart, 
   onStop 
 }) => {
+  const markers = [
+    task.duration != null ? { icon: '⏱', label: 'Has duration' } : null,
+    task.isAutoRepeat ? { icon: '🔄', label: 'Auto repeat' } : null,
+    task.isAutoApprove ? { icon: '⚡', label: 'Auto approve' } : null,
+    task.isAutoPayout ? { icon: '💰', label: 'Auto payout' } : null,
+  ].filter((marker): marker is { icon: string; label: string } => marker !== null);
 
   // Функция-фильтр для нажатий
   const handlePress = (e: React.MouseEvent | React.TouchEvent, action: 'start' | 'stop') => {
@@ -39,7 +58,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
     if ((e.target as HTMLElement).closest('button')) return;
 
     if (action === 'start') {
-      if (!isWaiting) onStart();
+      if (!isWaiting && !isProcessing) onStart();
     } else {
       onStop();
     }
@@ -50,6 +69,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
       className={`
         ${styles.taskCard} 
         ${isHolding ? 'shaking-intense' : ''} 
+        ${isProcessing ? styles.taskProcessing : ''}
         ${isWaiting ? styles.taskWaiting : ''}
       `}
       // Используем нашу функцию-фильтр
@@ -66,27 +86,70 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         WebkitUserSelect: 'none'
       }}
     >
+      {markers.length > 0 && (
+        <div className={styles.taskMarkers}>
+          {markers.map((marker) => (
+            <span
+              key={marker.label}
+              className={styles.taskMarker}
+              role="img"
+              aria-label={marker.label}
+              title={marker.label}
+            >
+              {marker.icon}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className={styles.deadlineTag}>
-        {isWaiting ? '⏳' : `⏱️ ${deadlineText}`}
+        {isWaiting || isProcessing ? '⏳' : `🕘 ${deadlineText}`}
       </div>
 
-      {isHolding && !isWaiting && (
+      {isHolding && !isWaiting && !isProcessing && (
         <svg className="loading-ring" width="100%" height="100%" viewBox="0 0 100 100" style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none' }}>
           <circle cx="50" cy="50" r="48" style={{ fill: 'none', stroke: 'var(--accent-orange)', strokeWidth: 4, strokeDasharray: '302', strokeDashoffset: '302', animation: 'borderFill 5s linear forwards', strokeLinecap: 'round' }} />
         </svg>
       )}
 
-      <span className={styles.taskIcon} style={{ filter: isWaiting ? 'grayscale(1)' : 'none' }}>
+      {isProcessing && (
+        <svg className={styles.processingRing} width="100%" height="100%" viewBox="0 0 100 100" aria-hidden="true">
+          <circle className={styles.processingRingTrack} cx="50" cy="50" r="46" />
+          <circle className={styles.processingRingArc} cx="50" cy="50" r="46" />
+        </svg>
+      )}
+
+      <span className={styles.taskIcon} style={{ filter: isWaiting || isProcessing ? 'grayscale(1)' : 'none' }}>
         {task.icon || '📝'}
       </span>
       
-      <div className={isWaiting ? styles.waitingText : styles.taskLabel}>
+      <div className={isWaiting || isProcessing ? styles.waitingText : styles.taskLabel}>
         {task.label}
       </div>
 
-      <div className={isWaiting ? styles.waitingText : styles.taskPoints}>
-        {isWaiting ? waitingLabel : `+${task.points}`}
-      </div>
+      {isProcessing ? (
+        <div className={styles.processingMeta}>
+          <span className={styles.inlineSpinnerLight} aria-hidden="true" />
+          <span>{processingLabel}</span>
+        </div>
+      ) : (
+        <div className={isWaiting ? styles.waitingText : styles.taskPoints}>
+          {isWaiting ? waitingLabel : `+${task.points}`}
+        </div>
+      )}
+
+      {task.duration ? (
+        <button
+          type="button"
+          onClick={onTimerClick}
+          className={styles.timerChip}
+          aria-label={timerLabel}
+          title={timerLabel}
+          disabled={isProcessing}
+        >
+          ⏱ {timerText}
+        </button>
+      ) : null}
     </div>
   );
 };

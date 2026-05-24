@@ -44,43 +44,29 @@ service cloud.firestore {
         sameFamily(resource.data.familyId);
     }
 
+    function selfCanUpdateOwnAvatar(userId) {
+      return userId == selfUid() &&
+        request.resource.data.familyId == resource.data.familyId &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.uid == resource.data.uid &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly(['avatar']);
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn() &&
         (userId == selfUid() || sameFamily(resource.data.familyId));
 
-      allow create: if isSignedIn() && (
-        (
-          userId == selfUid() &&
-          request.resource.data.uid == selfUid() &&
-          request.resource.data.familyId is string &&
-          (request.resource.data.role == 'child' || request.resource.data.role == 'parent') &&
-          request.resource.data.currentBalance == 0 &&
-          request.resource.data.totalPoints == 0
-        ) ||
-        (
-          isParent() &&
-          request.resource.data.familyId == currentProfile().data.familyId &&
-          request.resource.data.currentBalance == 0 &&
-          request.resource.data.totalPoints == 0
-        )
-      );
+      allow create: if isSignedIn() &&
+        userId == selfUid() &&
+        request.resource.data.uid == selfUid() &&
+        request.resource.data.familyId is string &&
+        (request.resource.data.role == 'child' || request.resource.data.role == 'parent') &&
+        request.resource.data.currentBalance == 0 &&
+        request.resource.data.totalPoints == 0;
 
-      allow update: if isSignedIn() && (
-        (
-          userId == selfUid() &&
-          request.resource.data.familyId == resource.data.familyId &&
-          request.resource.data.role == resource.data.role &&
-          request.resource.data.uid == resource.data.uid
-        ) ||
-        (
-          isParent() &&
-          sameFamily(resource.data.familyId) &&
-          request.resource.data.familyId == resource.data.familyId
-        )
-      );
+      allow update: if isSignedIn() && selfCanUpdateOwnAvatar(userId);
 
-      allow delete: if isSignedIn() &&
-        (userId == selfUid() || (isParent() && sameFamily(resource.data.familyId)));
+      allow delete: if isSignedIn() && userId == selfUid();
     }
 
     match /tasks_list/{taskId} {
@@ -99,26 +85,14 @@ service cloud.firestore {
       allow read: if isSignedIn() && resourceInOwnFamily() &&
         (resource.data.userId == selfUid() || isParent());
 
-      allow create: if isSignedIn() &&
-        requestInOwnFamily() &&
-        request.resource.data.userId is string &&
-        sameFamilyUser(request.resource.data.userId) &&
-        (request.resource.data.userId == selfUid() || isParent());
-
-      allow delete: if isSignedIn() &&
-        resourceInOwnFamily() &&
-        (resource.data.userId == selfUid() || isParent());
+      allow create, update, delete: if false;
     }
 
     match /history/{historyId} {
       allow read: if isSignedIn() && resourceInOwnFamily() &&
         (resource.data.userId == selfUid() || isParent());
 
-      allow create: if isSignedIn() &&
-        requestInOwnFamily() &&
-        request.resource.data.userId is string &&
-        sameFamilyUser(request.resource.data.userId) &&
-        (request.resource.data.userId == selfUid() || isParent());
+      allow create, update, delete: if false;
     }
 
     match /achievements_list/{itemId} {

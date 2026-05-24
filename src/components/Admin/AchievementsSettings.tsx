@@ -26,6 +26,8 @@ export const AchievementsSettings = ({ t, familyId }: { t: TranslationContent; f
   const [bonus, setBonus] = useState('');
   const [threshold, setThreshold] = useState(100);
   const [icon, setIcon] = useState('🏆');
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   const adm = t.admin || {};
   const loading = !!familyId && loadedFamilyId !== familyId;
@@ -38,8 +40,8 @@ export const AchievementsSettings = ({ t, familyId }: { t: TranslationContent; f
       const data = snap.docs
         .map(d => {
           const itemData = d.data();
-          return { 
-            id: d.id, 
+          return {
+            id: d.id,
             ...itemData,
             // Поддержка старых данных (если раньше был translationKey)
             label: itemData.label || itemData.labelRu || itemData.translationKey || ''
@@ -53,23 +55,43 @@ export const AchievementsSettings = ({ t, familyId }: { t: TranslationContent; f
   }, [familyId]);
 
   const saveItem = async () => {
-    if (!label || !familyId) return;
+    const trimmedLabel = label.trim();
+    if (!trimmedLabel) {
+      setSaveError('Введите название достижения.');
+      return;
+    }
+
+    if (!familyId) {
+      setSaveError('Семья ещё не загрузилась. Попробуй ещё раз.');
+      return;
+    }
+
+    setIsSaving(true);
+    setSaveError('');
+
     const id = `title_${Date.now()}`;
     const itemData = {
       threshold,
       icon,
-      label, 
-      bonus,
+      label: trimmedLabel,
+      bonus: bonus.trim(),
       familyId,
       type: 'title' as const,
     };
 
-    await upsertCatalogItemMutation(
-      { itemId: id, item: itemData },
-      async () => setDoc(doc(db, "achievements_list", id), itemData),
-    );
-    setLabel('');
-    setBonus('');
+    try {
+      await upsertCatalogItemMutation(
+        { itemId: id, item: itemData },
+        async () => setDoc(doc(db, "achievements_list", id), itemData),
+      );
+      setLabel('');
+      setBonus('');
+    } catch (error) {
+      console.error('Failed to save achievement', error);
+      setSaveError('Не удалось добавить достижение. Попробуй ещё раз.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleDeleteItem = async (itemId: string) => {
@@ -85,19 +107,31 @@ export const AchievementsSettings = ({ t, familyId }: { t: TranslationContent; f
   return (
     <div className={styles.card}>
       <h3 style={{ color: 'var(--accent-orange)' }}>{t.admin.levelsTitle}</h3>
-      
-      <div className={styles.mainForm} style={{ background: 'var(--bg-color)', padding: '15px', borderRadius: '20px', marginBottom: '20px' }}>
-        
+
+      <div className={styles.mainForm} style={{ position: 'relative', background: 'var(--bg-color)', padding: '15px', borderRadius: '20px', marginBottom: '20px' }}>
+        {isSaving ? (
+          <div className={styles.formBusyOverlay}>
+            <div className={styles.formBusyOverlayCard}>
+              <span className={styles.inlineSpinner} aria-hidden="true" />
+              <span>{t.loading}</span>
+            </div>
+          </div>
+        ) : null}
+
         {/* ВЫБОР ИКОНКИ */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '15px', background: '#fff', padding: '10px', borderRadius: '12px' }}>
           {QUICK_ICONS.map(i => (
-            <span 
-              key={i} 
-              onClick={() => setIcon(i)}
-              style={{ 
-                fontSize: '24px', cursor: 'pointer', padding: '5px',
+            <span
+              key={i}
+              onClick={() => {
+                if (isSaving) return;
+                setIcon(i);
+              }}
+              style={{
+                fontSize: '24px', cursor: isSaving ? 'wait' : 'pointer', padding: '5px',
                 borderRadius: '8px', background: icon === i ? '#fff3e0' : 'transparent',
-                border: icon === i ? '1px solid var(--accent-orange)' : '1px solid transparent'
+                border: icon === i ? '1px solid var(--accent-orange)' : '1px solid transparent',
+                opacity: isSaving ? 0.6 : 1,
               }}
             >{i}</span>
           ))}
@@ -105,37 +139,54 @@ export const AchievementsSettings = ({ t, familyId }: { t: TranslationContent; f
 
         {/* НАЗВАНИЕ УРОВНЯ */}
         <div className={styles.inputRow}>
-          <input 
-            className={styles.labelInput} 
-            value={label} 
-            onChange={e => setLabel(e.target.value)} 
+          <input
+            className={styles.labelInput}
+            value={label}
+            onChange={e => {
+              setLabel(e.target.value);
+              if (saveError) setSaveError('');
+            }}
             // Используем универсальный placeholder из переводов
-            placeholder={adm.placeholderName || "Название уровня..."} 
+            placeholder={adm.placeholderName || "Название уровня..."}
+            disabled={isSaving}
           />
         </div>
 
         <div className={styles.inputRow} style={{ marginTop: '10px' }}>
-          <input 
-            className={styles.labelInput} 
-            value={bonus} 
-            onChange={e => setBonus(e.target.value)} 
-            placeholder={adm.placeholderBonus || "🎁 Приз за достижение..."} 
+          <input
+            className={styles.labelInput}
+            value={bonus}
+            onChange={e => {
+              setBonus(e.target.value);
+              if (saveError) setSaveError('');
+            }}
+            placeholder={adm.placeholderBonus || "🎁 Приз за достижение..."}
+            disabled={isSaving}
             style={{ borderColor: 'var(--accent-green)' }}
           />
         </div>
 
         <div style={{ marginTop: '10px' }}>
           <span style={{ fontSize: '12px' }}>{t.achievements.needed} (XP)</span>
-          <input 
-            type="number" 
-            className={styles.numberInput} 
-            value={threshold} 
-            onChange={e => setThreshold(Number(e.target.value))} 
+          <input
+            type="number"
+            className={styles.numberInput}
+            value={threshold}
+            onChange={e => {
+              setThreshold(Number(e.target.value));
+              if (saveError) setSaveError('');
+            }}
+            disabled={isSaving}
           />
         </div>
 
-        <button onClick={saveItem} className={styles.submitBtn} style={{ marginTop: '15px', background: 'var(--accent-orange)' }}>
-          ➕ {adm.btnAdd}
+        {saveError ? <div className={`${styles.formMessage} ${styles.formError}`}>{saveError}</div> : null}
+
+        <button onClick={saveItem} className={styles.submitBtn} style={{ marginTop: '15px', background: 'var(--accent-orange)' }} disabled={isSaving}>
+          <span className={styles.submitBtnContent}>
+            {isSaving ? <span className={styles.inlineSpinner} aria-hidden="true" /> : null}
+            <span>{isSaving ? t.loading : `➕ ${adm.btnAdd}`}</span>
+          </span>
         </button>
       </div>
 
@@ -157,8 +208,8 @@ export const AchievementsSettings = ({ t, familyId }: { t: TranslationContent; f
                 )}
               </div>
             </div>
-            <button 
-              onClick={() => handleDeleteItem(item.id)} 
+            <button
+              onClick={() => handleDeleteItem(item.id)}
               className={styles.deleteBtn}
             >
               &times;

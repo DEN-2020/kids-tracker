@@ -32,6 +32,8 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
   const [items, setItems] = useState<ShopItem[]>([]);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [shakingErrorId, setShakingErrorId] = useState<string | null>(null);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
   const [loadedFamilyId, setLoadedFamilyId] = useState('');
   
   const timerRef = useRef<number | null>(null);
@@ -41,16 +43,28 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
   const visibleItems = isLoaded ? items : [];
   const uiText = {
     fi: {
-      purchaseSent: 'Tilaus lähetetty!',
+      purchaseSent: 'Ostopyyntö lähetetty.',
       confirmPurchase: (itemName: string) => `Osta "${itemName}"?`,
+      insufficientFunds: 'Pisteet eivät riitä tähän ostoon.',
+      purchaseFailed: 'Osto epäonnistui. Tarkista saldo ja odottavat pyynnöt.',
+      syncing: 'Synkronoidaan pilveen...',
+      submitting: 'Lähetetään...',
     },
     ru: {
-      purchaseSent: 'Запрос отправлен!',
+      purchaseSent: 'Запрос на покупку отправлен.',
       confirmPurchase: (itemName: string) => `Купить "${itemName}"?`,
+      insufficientFunds: 'Недостаточно баллов для этой покупки.',
+      purchaseFailed: 'Покупка не прошла. Проверь баланс и ожидающие заявки.',
+      syncing: 'Синхронизация с облаком...',
+      submitting: 'Отправляем...',
     },
     en: {
-      purchaseSent: 'Request sent!',
+      purchaseSent: 'Purchase request sent.',
       confirmPurchase: (itemName: string) => `Buy "${itemName}"?`,
+      insufficientFunds: 'Not enough points for this purchase.',
+      purchaseFailed: 'Purchase failed. Check the balance and pending requests.',
+      syncing: 'Syncing with cloud...',
+      submitting: 'Submitting...',
     },
   }[lang];
 
@@ -95,35 +109,56 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
   // Вынесли логику отправки в отдельную функцию для удобства
   const executePurchase = async (item: ShopItem) => {
     const itemName = getItemName(item);
-    try {
-      successSound.currentTime = 0;
-      successSound.play().catch(() => {});
+    const itemTypeLabel = item.type === 'exchange' ? t.admin.typeMoney : t.admin.typeReward;
+    const purchaseLabel = `${itemTypeLabel}: ${itemName}`;
 
+    setSubmittingId(item.id);
+    setFeedback(null);
+
+    try {
       await submitApprovalMutation({
-        familyId,
         icon: item.icon,
-        label: `${t.admin.typeReward}: ${itemName}`,
+        itemId: item.id,
+        label: purchaseLabel,
         points: -Number(item.threshold),
         status: 'pending',
         userId,
       }, async () => addDoc(collection(db, "approvals"), {
+        approvalType: 'purchase',
+        itemId: item.id,
         userId,
         familyId,
-        label: `${t.admin.typeReward}: ${itemName}`,
+        label: purchaseLabel,
         points: -Number(item.threshold),
         icon: item.icon,
         status: 'pending',
         createdAt: new Date().toISOString()
       }));
-
-      alert(uiText.purchaseSent);
+      successSound.currentTime = 0;
+      successSound.play().catch(() => {});
+      setFeedback({ tone: 'success', text: uiText.purchaseSent });
     } catch (error) {
       console.error("Ошибка покупки:", error);
+      setShakingErrorId(item.id);
+      setFeedback({ tone: 'error', text: uiText.purchaseFailed });
+      window.setTimeout(() => setShakingErrorId(null), 500);
+    } finally {
+      setSubmittingId(null);
     }
   };
 
   const handleStartHold = (item: ShopItem) => {
-    if (holdId) return;
+    if (holdId || submittingId) return;
+
+    const price = Number(item.threshold);
+    const balance = Number(currentBalance);
+
+    if (balance < price) {
+      setFeedback({ tone: 'error', text: uiText.insufficientFunds });
+      setShakingErrorId(item.id);
+      setTimeout(() => setShakingErrorId(null), 500);
+      return;
+    }
 
     // ЛОГИКА ДЛЯ РОДИТЕЛЯ: Мгновенное подтверждение
     if (userRole === 'parent') {
@@ -134,17 +169,8 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
       return;
     }
 
-    // ЛОГИКА ДЛЯ РЕБЕНКА
-    const price = Number(item.threshold);
-    const balance = Number(currentBalance);
-
-    if (balance < price) {
-      setShakingErrorId(item.id);
-      setTimeout(() => setShakingErrorId(null), 500);
-      return;
-    }
-
     setHoldId(item.id);
+    setFeedback(null);
     holdSound.currentTime = 0;
     holdSound.play().catch(() => {});
 
@@ -176,12 +202,38 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
         <span style={{ color: 'var(--accent-green)' }}>{t.shop?.title || 'Shop'}</span> 
         <span style={{ color: 'var(--text-main)' }}> 💰 {currentBalance}</span>
       </h3>
+
+      {feedback ? (
+        <div
+          style={{
+            marginBottom: '14px',
+            padding: '12px 14px',
+            borderRadius: '14px',
+            fontWeight: 700,
+            color: feedback.tone === 'success' ? '#c8facc' : '#ffd7d7',
+            background: feedback.tone === 'success' ? 'rgba(76, 175, 80, 0.14)' : 'rgba(255, 82, 82, 0.14)',
+            border: feedback.tone === 'success'
+              ? '1px solid rgba(76, 175, 80, 0.35)'
+              : '1px solid rgba(255, 82, 82, 0.35)',
+          }}
+        >
+          {feedback.text}
+        </div>
+      ) : null}
+
+      {submittingId ? (
+        <div className={styles.syncBanner} style={{ marginBottom: '14px' }}>
+          <span className={styles.inlineSpinnerLight} aria-hidden="true" />
+          <span>{uiText.syncing}</span>
+        </div>
+      ) : null}
       
       <div className={styles.tasksGrid} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
         {visibleItems.map((item) => {
           const itemName = getItemName(item);
           const isHolding = holdId === item.id;
           const isError = shakingErrorId === item.id;
+          const isSubmitting = submittingId === item.id;
           const canAfford = currentBalance >= item.threshold;
 
           return (
@@ -194,7 +246,7 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
               onTouchEnd={handleStopHold}
               className={`
                 ${styles.shopCard || ''} 
-                ${canAfford || userRole === 'parent' ? (styles.shopCardAffordable || '') : (styles.shopCardLocked || '')}
+                ${canAfford ? (styles.shopCardAffordable || '') : (styles.shopCardLocked || '')}
                 ${isHolding ? (styles.shakingIntense || '') : ''} 
                 ${isError ? (styles.insufficientFunds || '') : ''}
               `}
@@ -211,7 +263,9 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
                 overflow: 'hidden',
                 touchAction: 'none', 
                 userSelect: 'none',
-                cursor: 'pointer'
+                cursor: isSubmitting ? 'wait' : 'pointer',
+                opacity: isSubmitting ? 0.75 : 1,
+                pointerEvents: isSubmitting ? 'none' : 'auto',
               }}
             >
               {isHolding && (
@@ -226,11 +280,18 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
                 }} />
               )}
 
+              {isSubmitting ? (
+                <div className={styles.shopSubmittingOverlay}>
+                  <span className={styles.inlineSpinner} aria-hidden="true" />
+                  <span className={styles.shopSubmittingText}>{uiText.submitting}</span>
+                </div>
+              ) : null}
+
               <div style={{fontSize: '40px'}}>{item.icon}</div>
               <div style={{fontWeight: 'bold', textAlign: 'center', color: 'white'}}>{itemName}</div>
               
               <div style={{
-                background: (canAfford || userRole === 'parent') ? 'var(--accent-green)' : '#666',
+                background: canAfford ? 'var(--accent-green)' : '#666',
                 color: 'white',
                 padding: '2px 10px',
                 borderRadius: '10px',

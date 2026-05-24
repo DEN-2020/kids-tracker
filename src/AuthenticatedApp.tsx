@@ -38,10 +38,11 @@ export default function AuthenticatedApp({ initialProfile, lang, setLang, t }: A
   // ИСПРАВЛЕНО: Убраны any из стейтов
   const [availableTasks, setAvailableTasks] = useState<Task[]>([]);
   const [myApprovals, setMyApprovals] = useState<Approval[]>([]);
-  const [totalPoints, setTotalPoints] = useState<number>(0);
-  const [runningTimer, setRunningTimer] = useState<{ id: string, timeLeft: number } | null>(null);
+  const [currentBalance, setCurrentBalance] = useState<number>(0);
+  const [currentXp, setCurrentXp] = useState<number>(0);
+  const [runningTimer, setRunningTimer] = useState<{ taskId: string, timeLeft: number } | null>(null);
   const [adminSubTab, setAdminSubTab] = useState<'tasks' | 'edit' | 'shop' | 'levels' | 'family'>('tasks');
-  const runningTimerId = runningTimer?.id;
+  const runningTimerTaskId = runningTimer?.taskId;
 
   const isFullProfile = (p: AppProfile): p is UserProfile => !!p.familyId;
 
@@ -72,7 +73,10 @@ export default function AuthenticatedApp({ initialProfile, lang, setLang, t }: A
     }
 
     const unsubPoints = onSnapshot(doc(db, "users", targetId), (snap) => {
-      if (snap.exists()) setTotalPoints(snap.data().currentBalance || 0);
+      if (snap.exists()) {
+        setCurrentBalance(Number(snap.data().currentBalance) || 0);
+        setCurrentXp(Number(snap.data().totalPoints) || 0);
+      }
     });
 
     const unsubTasks = onSnapshot(
@@ -105,7 +109,7 @@ export default function AuthenticatedApp({ initialProfile, lang, setLang, t }: A
   }, [selectedChildId, profile]);
 
   useEffect(() => {
-    if (!runningTimerId) return;
+    if (!runningTimerTaskId) return;
 
     const intervalId = window.setInterval(() => {
       setRunningTimer((currentTimer) => {
@@ -116,19 +120,20 @@ export default function AuthenticatedApp({ initialProfile, lang, setLang, t }: A
     }, 1000);
 
     return () => window.clearInterval(intervalId);
-  }, [runningTimerId]);
+  }, [runningTimerTaskId]);
 
   useEffect(() => {
-    if (!runningTimerId) return;
+    if (!runningTimerTaskId) return;
 
-    const timerApprovalStillActive = myApprovals.some(
-      (approval) => approval.id === runningTimerId && approval.status === 'in_progress',
+    const timerTaskStillVisible = availableTasks.some((task) => task.id === runningTimerTaskId);
+    const timerTaskStillInProgress = myApprovals.some(
+      (approval) => approval.taskId === runningTimerTaskId && approval.status === 'in_progress',
     );
 
-    if (!timerApprovalStillActive) {
+    if (!timerTaskStillVisible && !timerTaskStillInProgress) {
       setRunningTimer(null);
     }
-  }, [myApprovals, runningTimerId]);
+  }, [availableTasks, myApprovals, runningTimerTaskId]);
 
 const handleUploadPhoto = async (file: File) => {
   const { uploadAvatar } = await import('./services/storage');
@@ -171,13 +176,13 @@ const handleUploadPhoto = async (file: File) => {
           </div>
         )}
 
-        <Header total={totalPoints} lang={lang} setLang={setLang} t={t} />
+        <Header total={currentBalance} lang={lang} setLang={setLang} t={t} />
 
         <Suspense fallback={<div>{t.loading}</div>}>
-          {activeTab === 'tasks' && <TaskList t={t} lang={lang} userRole={profile.role} availableTasks={availableTasks} myApprovals={myApprovals} runningTimer={runningTimer} formatTime={(s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`} startTaskTimer={(id, m) => setRunningTimer({id, timeLeft: m*60})} markAsDone={async (id) => { const app = myApprovals.find(a => a.id === id); if (app) { await completeTransaction(app.id, app.userId, app.points, app.taskId, { familyId: profile.familyId, label: app.label }); if (runningTimer?.id === id) setRunningTimer(null); } }} requestToStart={async (task) => { const targetId = profile.role === 'parent' ? selectedChildId : profile.uid; if (profile.role === 'parent' || task.isAutoApprove) { await completeTransaction(`direct_${Date.now()}`, targetId, task.points, task.id, { familyId: profile.familyId, label: task.label }); } else { await createTaskApproval(task, profile); } }} />}
+          {activeTab === 'tasks' && <TaskList t={t} lang={lang} userRole={profile.role} availableTasks={availableTasks} myApprovals={myApprovals} runningTimer={runningTimer} formatTime={(s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`} startTaskTimer={(taskId, m) => setRunningTimer({ taskId, timeLeft: m * 60 })} markAsDone={async (id) => { const app = myApprovals.find(a => a.id === id); if (app) { await completeTransaction(app.id, app.userId, app.points, app.taskId, { familyId: profile.familyId, label: app.label }); if (runningTimer?.taskId === app.taskId) setRunningTimer(null); } }} requestToStart={async (task) => { const targetId = profile.role === 'parent' ? selectedChildId : profile.uid; if (profile.role === 'parent' || task.isAutoApprove) { await completeTransaction(`direct_${Date.now()}`, targetId, task.points, task.id, { familyId: profile.familyId, label: task.label }); } else { await createTaskApproval(task, profile); } }} />}
           {activeTab === 'stats' && <Stats t={t} lang={lang} childId={currentChildData?.uid || ''} familyId={profile.familyId} />}
-          {activeTab === 'awards' && <Achievements t={t} totalPoints={currentChildData?.totalPoints || 0} userId={currentChildData?.uid || ''} familyId={profile.familyId} />}
-          {activeTab === 'shop' && <Shop t={t} lang={lang} currentBalance={totalPoints} userId={currentChildData?.uid || ''} familyId={profile.familyId} userRole={profile.role} />}
+          {activeTab === 'awards' && <Achievements t={t} totalPoints={profile.role === 'parent' ? (currentChildData?.totalPoints || 0) : currentXp} userId={currentChildData?.uid || ''} familyId={profile.familyId} />}
+          {activeTab === 'shop' && <Shop t={t} lang={lang} currentBalance={currentBalance} userId={currentChildData?.uid || ''} familyId={profile.familyId} userRole={profile.role} />}
           {activeTab === 'admin' && profile.role === 'parent' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '5px', background: 'rgba(255,255,255,0.05)', padding: '5px', borderRadius: '16px' }}>

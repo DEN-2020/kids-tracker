@@ -180,6 +180,13 @@
   font-weight: bold;
 }
 
+.inputHelp {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--text-secondary);
+  margin: 2px 2px 0 10px;
+}
+
 .numberInput {
   padding: 12px;
   border-radius: 16px;
@@ -195,7 +202,8 @@
 
 .actionButton {
   flex: 1;
-  padding: 12px 5px;
+  min-height: 96px;
+  padding: 12px 8px;
   border-radius: 16px;
   cursor: pointer;
   text-align: center;
@@ -208,6 +216,12 @@
 
 .actionIcon { font-size: 22px; }
 .actionLabel { font-size: 10px; font-weight: bold; text-transform: uppercase; }
+.actionNote {
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--text-secondary);
+  text-transform: none;
+}
 
 .submitBtn {
   padding: 16px;
@@ -219,6 +233,84 @@
   cursor: pointer;
   font-size: 16px;
   transition: transform 0.1s;
+}
+
+.submitBtnContent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.submitBtn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.inlineSpinner,
+.inlineSpinnerLight {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-top-color: currentColor;
+  animation: adminSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.inlineSpinner {
+  color: white;
+}
+
+.inlineSpinnerLight {
+  color: var(--accent-blue);
+  border-color: rgba(99, 102, 241, 0.22);
+}
+
+.busyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.formBusyOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.formBusyOverlayCard {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.9);
+  color: white;
+  font-weight: 800;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.formMessage {
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.formError {
+  color: #ffd7d7;
+  background: rgba(255, 82, 82, 0.14);
+  border: 1px solid rgba(255, 82, 82, 0.35);
 }
 
 /* Контейнер для списка задач */
@@ -307,6 +399,11 @@
 .templateSelected {
   background: var(--card-bg); /* или чуть светлее */
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+@keyframes adminSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Главный контейнер для групп (вертикальный стек) */

@@ -31,6 +31,125 @@
   transition: width 0.5s ease-out;
 }
 
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 14, 28, 0.58);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 1200;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 20px;
+}
+
+.confirmSheet {
+  width: min(420px, 100%);
+  background: color-mix(in srgb, var(--card-bg) 92%, #101728);
+  border: 1px solid var(--border-color);
+  border-radius: 28px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  padding: 22px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirmIcon {
+  font-size: 34px;
+}
+
+.confirmTitle {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.confirmLabel {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.confirmPoints {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--accent-blue);
+}
+
+.confirmActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.confirmCancelBtn,
+.confirmOkBtn {
+  border: none;
+  border-radius: 16px;
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.confirmCancelBtn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-main);
+}
+
+.confirmOkBtn {
+  background: var(--accent-blue);
+  color: white;
+}
+
+.confirmOkBtn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.confirmBtnContent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.syncBanner {
+  margin-bottom: 15px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.inlineSpinner,
+.inlineSpinnerLight {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  border-top-color: currentColor;
+  animation: processingSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.inlineSpinner {
+  color: white;
+}
+
+.inlineSpinnerLight {
+  color: var(--accent-blue);
+  border-color: rgba(99, 102, 241, 0.18);
+}
+
 /* 2. Сетки (Grids) */
 .tasksGrid {
   display: grid;
@@ -45,7 +164,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 20px;
+  padding: 34px 20px 20px;
   border-radius: 24px;  
   background-color: var(--card-bg);
   cursor: pointer;
@@ -78,7 +197,62 @@
   pointer-events: none;
 }
 
+.taskProcessing {
+  border-color: var(--accent-orange);
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.18);
+  pointer-events: none;
+}
+
+.processingRing {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.processingRingTrack,
+.processingRingArc {
+  fill: none;
+  stroke-width: 4;
+}
+
+.processingRingTrack {
+  stroke: rgba(245, 158, 11, 0.16);
+}
+
+.processingRingArc {
+  stroke: var(--accent-orange);
+  stroke-linecap: round;
+  stroke-dasharray: 88 289;
+  transform-origin: 50px 50px;
+  animation: processingSpin 1s linear infinite;
+}
+
 /* 4. Элементы внутри карточек */
+.taskMarkers {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 11;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 86px);
+  padding: 3px 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  background: color-mix(in srgb, var(--card-bg) 86%, var(--bg-color));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.taskMarker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+}
+
 .deadlineTag {
   position: absolute;
   top: 8px;
@@ -106,6 +280,60 @@
   font-weight: bold;
 }
 
+.processingMeta {
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-orange);
+  font-weight: 800;
+}
+
+.timerChip {
+  margin-top: 10px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-blue);
+  background: rgba(33, 150, 243, 0.12);
+  color: var(--accent-blue);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.timerChip:hover {
+  background: rgba(33, 150, 243, 0.18);
+}
+
+.timerChip:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+@media (max-width: 480px) {
+  .taskCard {
+    padding: 32px 14px 16px;
+  }
+
+  .taskMarkers {
+    top: 7px;
+    left: 7px;
+    gap: 3px;
+    max-width: calc(100% - 78px);
+    padding: 2px 5px;
+  }
+
+  .taskMarker {
+    font-size: 11px;
+  }
+
+  .deadlineTag {
+    top: 7px;
+    right: 7px;
+    font-size: 9px;
+  }
+}
+
 /* 5. Магазин (Shop) */
 .shopCard {
   position: relative;
@@ -130,6 +358,26 @@
 .shopCardLocked {
   border-color: var(--border-color);
   opacity: 0.6;
+}
+
+.shopSubmittingOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.46);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  z-index: 2;
+}
+
+.shopSubmittingText {
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .priceBadge {
@@ -183,6 +431,11 @@
 @keyframes borderFill {
   from { stroke-dashoffset: 302; }
   to { stroke-dashoffset: 0; }
+}
+
+@keyframes processingSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Полоски прогресса (5 секунд) */

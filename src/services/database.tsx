@@ -1,7 +1,7 @@
 // C:\Users\Admin\Documents\kids-tracker\src\services\database.tsx
 
 import { db } from '../db';
-import { doc, collection, writeBatch, increment, addDoc } from "firebase/firestore";
+import { doc, collection, writeBatch, increment, addDoc, getDoc } from "firebase/firestore";
 import { getLocalDayKey } from '../utils/dayKey';
 import {
   completeTaskDirectMutation,
@@ -10,7 +10,7 @@ import {
 } from './server';
 
 // Импортируем интерфейсы, чтобы не использовать "any"
-// Если они у тебя лежат в App.tsx, можно импортировать их оттуда 
+// Если они у тебя лежат в App.tsx, можно импортировать их оттуда
 // или просто описать здесь для чистоты
 interface Task {
   id: string;
@@ -19,6 +19,7 @@ interface Task {
   icon?: string;
   familyId?: string;
   isAutoApprove?: boolean;
+  isAutoRepeat?: boolean;
 }
 
 interface UserProfile {
@@ -46,6 +47,9 @@ export const completeTransaction = async (
 
   const fallback = async () => {
     const batch = writeBatch(db);
+    const taskRef = tId ? doc(db, "tasks_list", tId) : null;
+    const taskSnapshot = taskRef ? await getDoc(taskRef) : null;
+    const taskData = taskSnapshot?.exists() ? (taskSnapshot.data() as Partial<Task>) : null;
 
     if (isPurchase) {
       batch.update(doc(db, "users", uid), {
@@ -58,24 +62,28 @@ export const completeTransaction = async (
       });
     }
 
-    if (tId && !isPurchase) {
-      batch.update(doc(db, "tasks_list", tId), { 
-        lastCompleted: getLocalDayKey(),
-        lastCompletedAt: new Date(),
-      });
+    if (taskRef && taskData && !isPurchase) {
+      if (taskData.isAutoRepeat) {
+        batch.update(taskRef, {
+          lastCompleted: getLocalDayKey(),
+          lastCompletedAt: new Date(),
+        });
+      } else {
+        batch.delete(taskRef);
+      }
     }
 
     if (appId && !appId.startsWith('temp_')) {
       batch.delete(doc(db, "approvals", appId));
     }
-    
-    batch.set(doc(collection(db, "history")), { 
-      userId: uid, 
+
+    batch.set(doc(collection(db, "history")), {
+      userId: uid,
       ...(options.familyId ? { familyId: options.familyId } : {}),
-      points: historyPoints, 
-      label: historyLabel, 
-      type: isPurchase ? 'spend' : 'earn', 
-      date: new Date() 
+      points: historyPoints,
+      label: historyLabel,
+      type: isPurchase ? 'spend' : 'earn',
+      date: new Date()
     });
 
     return batch.commit();
@@ -106,18 +114,19 @@ export const createTaskApproval = async (task: Task, profile: UserProfile) => {
       icon: task.icon || '📝',
       label: task.label,
       points: task.points,
-      status: task.isAutoApprove ? "in_progress" : "pending",
+      status: 'pending',
       taskId: task.id,
       userId: profile.uid,
     },
     async () => addDoc(collection(db, "approvals"), {
-      taskId: task.id, 
-      label: task.label, 
+      approvalType: 'task',
+      taskId: task.id,
+      label: task.label,
       points: task.points,
-      status: task.isAutoApprove ? "in_progress" : "pending",
-      userId: profile.uid, 
-      familyId: profile.familyId, 
-      createdAt: new Date(), 
+      status: "pending",
+      userId: profile.uid,
+      familyId: profile.familyId,
+      createdAt: new Date(),
       icon: task.icon || '📝'
     }),
   );
