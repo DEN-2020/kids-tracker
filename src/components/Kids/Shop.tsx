@@ -26,9 +26,10 @@ interface ShopProps {
   familyId: string;
   lang: 'fi' | 'ru' | 'en';
   userRole?: 'child' | 'parent'; // ДОБАВИЛИ РОЛЬ
+  isOnline?: boolean;
 }
 
-export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId, lang, userRole }) => {
+export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId, lang, userRole, isOnline = true }) => {
   const [items, setItems] = useState<ShopItem[]>([]);
   const [holdId, setHoldId] = useState<string | null>(null);
   const [shakingErrorId, setShakingErrorId] = useState<string | null>(null);
@@ -49,6 +50,8 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
       purchaseFailed: 'Osto epäonnistui. Tarkista saldo ja odottavat pyynnöt.',
       syncing: 'Synkronoidaan pilveen...',
       submitting: 'Lähetetään...',
+      offline: 'Olet offline-tilassa. Ostot onnistuvat, kun yhteys palautuu.',
+      offlineShort: 'Offline',
     },
     ru: {
       purchaseSent: 'Запрос на покупку отправлен.',
@@ -57,6 +60,8 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
       purchaseFailed: 'Покупка не прошла. Проверь баланс и ожидающие заявки.',
       syncing: 'Синхронизация с облаком...',
       submitting: 'Отправляем...',
+      offline: 'Сейчас нет сети. Покупки можно отправить после подключения.',
+      offlineShort: 'Офлайн',
     },
     en: {
       purchaseSent: 'Purchase request sent.',
@@ -65,6 +70,8 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
       purchaseFailed: 'Purchase failed. Check the balance and pending requests.',
       syncing: 'Syncing with cloud...',
       submitting: 'Submitting...',
+      offline: 'You are offline. Purchases can be sent after reconnecting.',
+      offlineShort: 'Offline',
     },
   }[lang];
 
@@ -150,6 +157,13 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
   const handleStartHold = (item: ShopItem) => {
     if (holdId || submittingId) return;
 
+    if (!isOnline) {
+      setFeedback({ tone: 'error', text: uiText.offline });
+      setShakingErrorId(item.id);
+      setTimeout(() => setShakingErrorId(null), 500);
+      return;
+    }
+
     const price = Number(item.threshold);
     const balance = Number(currentBalance);
 
@@ -227,6 +241,13 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
           <span>{uiText.syncing}</span>
         </div>
       ) : null}
+
+      {!isOnline ? (
+        <div className={styles.offlineActionBanner}>
+          <span aria-hidden="true">📴</span>
+          <span>{uiText.offline}</span>
+        </div>
+      ) : null}
       
       <div className={styles.tasksGrid} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '10px' }}>
         {visibleItems.map((item) => {
@@ -235,6 +256,7 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
           const isError = shakingErrorId === item.id;
           const isSubmitting = submittingId === item.id;
           const canAfford = currentBalance >= item.threshold;
+          const isDisabled = isSubmitting || !isOnline;
 
           return (
             <div 
@@ -249,6 +271,7 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
                 ${canAfford ? (styles.shopCardAffordable || '') : (styles.shopCardLocked || '')}
                 ${isHolding ? (styles.shakingIntense || '') : ''} 
                 ${isError ? (styles.insufficientFunds || '') : ''}
+                ${!isOnline ? styles.taskOffline : ''}
               `}
               style={{
                 background: 'rgba(255,255,255,0.05)',
@@ -263,8 +286,8 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
                 overflow: 'hidden',
                 touchAction: 'none', 
                 userSelect: 'none',
-                cursor: isSubmitting ? 'wait' : 'pointer',
-                opacity: isSubmitting ? 0.75 : 1,
+                cursor: isDisabled ? 'not-allowed' : 'pointer',
+                opacity: isDisabled ? 0.68 : 1,
                 pointerEvents: isSubmitting ? 'none' : 'auto',
               }}
             >
@@ -298,7 +321,7 @@ export const Shop: React.FC<ShopProps> = ({ t, currentBalance, userId, familyId,
                 marginTop: 'auto',
                 fontSize: '14px'
               }}>
-                {item.threshold} pts
+                {isOnline ? `${item.threshold} pts` : uiText.offlineShort}
               </div>
             </div>
           );

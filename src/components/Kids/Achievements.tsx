@@ -22,9 +22,11 @@ interface AchievementsProps {
   totalPoints: number;
   userId: string;
   familyId: string;
+  lang: 'fi' | 'ru' | 'en';
+  isOnline?: boolean;
 }
 
-export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, userId, familyId }) => {
+export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, userId, familyId, lang, isOnline = true }) => {
   const [items, setItems] = useState<AchievementItem[]>([]);
   const [activatedIds, setActivatedIds] = useState<string[]>([]);
   const [holdId, setHoldId] = useState<string | null>(null);
@@ -34,6 +36,23 @@ export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, user
   const successSound = useRef(new Audio(successSoundFile)).current;
   const visibleItems = userId && familyId ? items : [];
   const visibleActivatedIds = userId ? activatedIds : [];
+  const uiText = {
+    fi: {
+      offline: 'Olet offline-tilassa. Tittelin aktivointi onnistuu, kun yhteys palautuu.',
+      offlineShort: 'Offline',
+      holdHint: 'Pidä 5s',
+    },
+    ru: {
+      offline: 'Сейчас нет сети. Звание можно активировать после подключения.',
+      offlineShort: 'Офлайн',
+      holdHint: 'Удерживай 5 сек',
+    },
+    en: {
+      offline: 'You are offline. Titles can be activated after reconnecting.',
+      offlineShort: 'Offline',
+      holdHint: 'Hold 5s',
+    },
+  }[lang];
 
   useEffect(() => {
     if (!userId || userId.trim() === "" || !familyId) return;
@@ -61,6 +80,7 @@ export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, user
   }, [familyId, userId]);
 
   const handleStartHold = (item: AchievementItem) => {
+    if (!isOnline) return;
     if (totalPoints < item.threshold || visibleActivatedIds.includes(item.id)) return;
 
     setHoldId(item.id);
@@ -99,6 +119,13 @@ export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, user
         <span style={{ fontSize: '14px' }}>{totalPoints} XP</span>
       </h3>
 
+      {!isOnline ? (
+        <div className={styles.offlineActionBanner}>
+          <span aria-hidden="true">📴</span>
+          <span>{uiText.offline}</span>
+        </div>
+      ) : null}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
         {visibleItems.map((item) => {
           const isReached = totalPoints >= item.threshold;
@@ -119,9 +146,10 @@ export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, user
                 ${isReached ? styles.glassCardUnlocked : ''} 
                 ${isHolding ? styles.shaking : ''}
                 ${isHolding ? styles.glassCardHolding : ''}
+                ${!isOnline ? styles.glassCardOffline : ''}
               `}
               style={{
-                cursor: isReached && !isActivated ? 'pointer' : 'default',
+                cursor: isOnline && isReached && !isActivated ? 'pointer' : 'default',
                 opacity: isReached ? 1 : 0.8
               }}
             >
@@ -166,8 +194,10 @@ export const Achievements: React.FC<AchievementsProps> = ({ t, totalPoints, user
                       color: isActivated ? '#4ade80' : 'rgba(255,255,255,0.3)',
                       border: isActivated ? '1px solid rgba(74, 222, 128, 0.2)' : '1px solid transparent'
                     }}>
-                      🎁 {isActivated ? item.bonus : isReached 
-                          ? (t.adminForm.saveBtn === 'Tallenna' ? 'Pidä 5s' : 'Удерживай 5 сек') 
+                      🎁 {isActivated ? item.bonus : !isOnline && isReached
+                          ? uiText.offlineShort
+                          : isReached
+                          ? uiText.holdHint
                           : `${t.achievements.needed} ${item.threshold - totalPoints} XP`}
                     </div>
                   )}

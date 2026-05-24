@@ -26,6 +26,8 @@ interface TaskItemProps {
   timerLabel: string;
   processingLabel: string;
   waitingLabel: string;
+  disabledLabel?: string;
+  isDisabled?: boolean;
   onTimerClick?: () => void;
   onStart: () => void;
   onStop: () => void;
@@ -41,6 +43,8 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   timerLabel,
   processingLabel,
   waitingLabel,
+  disabledLabel,
+  isDisabled = false,
   onTimerClick,
   onStart, 
   onStop 
@@ -56,6 +60,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
   const handlePress = (e: React.MouseEvent | React.TouchEvent, action: 'start' | 'stop') => {
     // Если нажали на кнопку внутри карточки — ничего не делаем, пусть работает кнопка
     if ((e.target as HTMLElement).closest('button')) return;
+    if (isDisabled) return;
 
     if (action === 'start') {
       if (!isWaiting && !isProcessing) onStart();
@@ -71,6 +76,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         ${isHolding ? 'shaking-intense' : ''} 
         ${isProcessing ? styles.taskProcessing : ''}
         ${isWaiting ? styles.taskWaiting : ''}
+        ${isDisabled ? styles.taskOffline : ''}
       `}
       // Используем нашу функцию-фильтр
       onMouseDown={(e) => handlePress(e, 'start')}
@@ -103,7 +109,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
       )}
 
       <div className={styles.deadlineTag}>
-        {isWaiting || isProcessing ? '⏳' : `🕘 ${deadlineText}`}
+        {isDisabled ? '📴' : isWaiting || isProcessing ? '⏳' : `🕘 ${deadlineText}`}
       </div>
 
       {isHolding && !isWaiting && !isProcessing && (
@@ -134,7 +140,7 @@ export const TaskItem: React.FC<TaskItemProps> = ({
         </div>
       ) : (
         <div className={isWaiting ? styles.waitingText : styles.taskPoints}>
-          {isWaiting ? waitingLabel : `+${task.points}`}
+          {isDisabled && disabledLabel ? disabledLabel : isWaiting ? waitingLabel : `+${task.points}`}
         </div>
       )}
 

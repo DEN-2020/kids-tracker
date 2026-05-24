@@ -130,6 +130,19 @@
   font-weight: 700;
 }
 
+.offlineActionBanner {
+  margin-bottom: 15px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--text-main);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+}
+
 .inlineSpinner,
 .inlineSpinnerLight {
   width: 16px;
@@ -201,6 +214,13 @@
   border-color: var(--accent-orange);
   box-shadow: 0 0 15px rgba(245, 158, 11, 0.18);
   pointer-events: none;
+}
+
+.taskOffline {
+  cursor: not-allowed;
+  border-color: var(--border-color);
+  opacity: 0.72;
+  filter: grayscale(0.35);
 }
 
 .processingRing {
@@ -408,6 +428,11 @@
   background: rgba(255, 152, 0, 0.1);
   border: 1px solid rgba(255, 152, 0, 0.3);
   box-shadow: 0 0 20px rgba(255, 152, 0, 0.15);
+}
+
+.glassCardOffline {
+  cursor: default;
+  filter: grayscale(0.2);
 }
 
 /* 7. АНИМАЦИИ И СОСТОЯНИЯ УДЕРЖАНИЯ */

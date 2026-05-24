@@ -11,6 +11,7 @@ import { completeTransaction, createTaskApproval } from './services/database';
 import { Header } from './components/Layout/Header';
 import { Navbar } from './components/Layout/Navbar';
 import { Footer } from './components/Layout/Footer';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
 
 const AppBackground = lazy(() => import('./components/Layout/AppBackground').then(m => ({ default: m.AppBackground })));
 const RegisterPage = lazy(() => import('./components/Auth/RegisterPage').then(m => ({ default: m.RegisterPage })));
@@ -43,6 +44,7 @@ export default function AuthenticatedApp({ initialProfile, lang, setLang, t }: A
   const [runningTimer, setRunningTimer] = useState<{ taskId: string, timeLeft: number } | null>(null);
   const [adminSubTab, setAdminSubTab] = useState<'tasks' | 'edit' | 'shop' | 'levels' | 'family'>('tasks');
   const runningTimerTaskId = runningTimer?.taskId;
+  const isOnline = useOnlineStatus();
 
   const isFullProfile = (p: AppProfile): p is UserProfile => !!p.familyId;
 
@@ -179,10 +181,10 @@ const handleUploadPhoto = async (file: File) => {
         <Header total={currentBalance} lang={lang} setLang={setLang} t={t} />
 
         <Suspense fallback={<div>{t.loading}</div>}>
-          {activeTab === 'tasks' && <TaskList t={t} lang={lang} userRole={profile.role} availableTasks={availableTasks} myApprovals={myApprovals} runningTimer={runningTimer} formatTime={(s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`} startTaskTimer={(taskId, m) => setRunningTimer({ taskId, timeLeft: m * 60 })} markAsDone={async (id) => { const app = myApprovals.find(a => a.id === id); if (app) { await completeTransaction(app.id, app.userId, app.points, app.taskId, { familyId: profile.familyId, label: app.label }); if (runningTimer?.taskId === app.taskId) setRunningTimer(null); } }} requestToStart={async (task) => { const targetId = profile.role === 'parent' ? selectedChildId : profile.uid; if (profile.role === 'parent' || task.isAutoApprove) { await completeTransaction(`direct_${Date.now()}`, targetId, task.points, task.id, { familyId: profile.familyId, label: task.label }); } else { await createTaskApproval(task, profile); } }} />}
+          {activeTab === 'tasks' && <TaskList t={t} lang={lang} isOnline={isOnline} userRole={profile.role} availableTasks={availableTasks} myApprovals={myApprovals} runningTimer={runningTimer} formatTime={(s) => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`} startTaskTimer={(taskId, m) => setRunningTimer({ taskId, timeLeft: m * 60 })} markAsDone={async (id) => { const app = myApprovals.find(a => a.id === id); if (app) { await completeTransaction(app.id, app.userId, app.points, app.taskId, { familyId: profile.familyId, label: app.label }); if (runningTimer?.taskId === app.taskId) setRunningTimer(null); } }} requestToStart={async (task) => { const targetId = profile.role === 'parent' ? selectedChildId : profile.uid; if (profile.role === 'parent' || task.isAutoApprove) { await completeTransaction(`direct_${Date.now()}`, targetId, task.points, task.id, { familyId: profile.familyId, label: task.label }); } else { await createTaskApproval(task, profile); } }} />}
           {activeTab === 'stats' && <Stats t={t} lang={lang} childId={currentChildData?.uid || ''} familyId={profile.familyId} />}
-          {activeTab === 'awards' && <Achievements t={t} totalPoints={profile.role === 'parent' ? (currentChildData?.totalPoints || 0) : currentXp} userId={currentChildData?.uid || ''} familyId={profile.familyId} />}
-          {activeTab === 'shop' && <Shop t={t} lang={lang} currentBalance={currentBalance} userId={currentChildData?.uid || ''} familyId={profile.familyId} userRole={profile.role} />}
+          {activeTab === 'awards' && <Achievements t={t} lang={lang} isOnline={isOnline} totalPoints={profile.role === 'parent' ? (currentChildData?.totalPoints || 0) : currentXp} userId={currentChildData?.uid || ''} familyId={profile.familyId} />}
+          {activeTab === 'shop' && <Shop t={t} lang={lang} isOnline={isOnline} currentBalance={currentBalance} userId={currentChildData?.uid || ''} familyId={profile.familyId} userRole={profile.role} />}
           {activeTab === 'admin' && profile.role === 'parent' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '5px', background: 'rgba(255,255,255,0.05)', padding: '5px', borderRadius: '16px' }}>

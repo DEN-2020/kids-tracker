@@ -39,6 +39,7 @@ interface Approval {
 interface TaskListProps {
   userRole?: 'child' | 'parent';
   lang?: 'fi' | 'ru' | 'en';
+  isOnline?: boolean;
   t: {
     inProgress: string;
     availableTasks: string;
@@ -72,6 +73,8 @@ const textByLang = {
     waiting: 'Odottaa...',
     processing: 'Suoritetaan...',
     syncing: 'Synkronoidaan pilveen...',
+    offline: 'Offline',
+    offlineHint: 'Olet offline-tilassa. Pilveen tallentavat toiminnot odottavat verkkoyhteyttä.',
     hoursShort: 't',
     minutesShort: 'min',
     timerHint: 'Ajastin',
@@ -85,6 +88,8 @@ const textByLang = {
     waiting: 'Ждем...',
     processing: 'Выполняется...',
     syncing: 'Синхронизация с облаком...',
+    offline: 'Офлайн',
+    offlineHint: 'Сейчас нет сети. Действия с сохранением в облако доступны после подключения.',
     hoursShort: 'ч',
     minutesShort: 'м',
     timerHint: 'Таймер',
@@ -98,6 +103,8 @@ const textByLang = {
     waiting: 'Waiting...',
     processing: 'Processing...',
     syncing: 'Syncing with cloud...',
+    offline: 'Offline',
+    offlineHint: 'You are offline. Cloud-saving actions are available after reconnecting.',
     hoursShort: 'h',
     minutesShort: 'm',
     timerHint: 'Timer',
@@ -123,6 +130,7 @@ export const TaskList: React.FC<TaskListProps> = ({
   formatTime, startTaskTimer, markAsDone, requestToStart,
   userRole,
   lang,
+  isOnline = true,
 }) => {
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({
     coin: new Audio(coinSoundFile),
@@ -175,6 +183,13 @@ export const TaskList: React.FC<TaskListProps> = ({
 
   // --- ОБРАБОТЧИКИ СОБЫТИЙ ---
   const executeRequest = async (task: Task) => {
+    if (!isOnline) {
+      stopHoldSound();
+      setHoldId(null);
+      setParentConfirmAction(null);
+      return;
+    }
+
     stopHoldSound();
     setHoldId(null);
     setParentConfirmAction(null);
@@ -201,6 +216,7 @@ export const TaskList: React.FC<TaskListProps> = ({
 
   const startHolding = (task: DisplayTask) => {
     const hasActiveRequest = myApprovals.some(a => a.taskId === task.id);
+    if (!isOnline) return;
     if (hasActiveRequest || task.isDone || task.isInWork || task.isPending || approvingId === task.id || holdId === task.id) return;
 
     if (userRole === 'parent') {
@@ -226,6 +242,11 @@ export const TaskList: React.FC<TaskListProps> = ({
   };
 
   const settleApproval = async (approval: Approval) => {
+    if (!isOnline) {
+      setParentConfirmAction(null);
+      return;
+    }
+
     if (approvingId === approval.id) return;
 
     setParentConfirmAction(null);
@@ -241,6 +262,7 @@ export const TaskList: React.FC<TaskListProps> = ({
 
   const handleDoneClick = async (e: React.MouseEvent, approval: Approval) => {
     e.stopPropagation();
+    if (!isOnline) return;
     if (approvingId === approval.id) return;
 
     if (userRole === 'parent') {
@@ -334,16 +356,23 @@ export const TaskList: React.FC<TaskListProps> = ({
               <button type="button" className={styles.confirmCancelBtn} onClick={() => setParentConfirmAction(null)} disabled={confirmBusy}>
                 {uiText.cancel}
               </button>
-              <button type="button" className={styles.confirmOkBtn} onClick={() => void confirmParentAction()} disabled={confirmBusy}>
+              <button type="button" className={styles.confirmOkBtn} onClick={() => void confirmParentAction()} disabled={confirmBusy || !isOnline}>
                 <span className={styles.confirmBtnContent}>
                   {confirmBusy ? <span className={styles.inlineSpinner} aria-hidden="true" /> : null}
-                  <span>{confirmBusy ? uiText.syncing : uiText.confirm}</span>
+                  <span>{!isOnline ? uiText.offline : confirmBusy ? uiText.syncing : uiText.confirm}</span>
                 </span>
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {!isOnline ? (
+        <div className={styles.offlineActionBanner}>
+          <span aria-hidden="true">📴</span>
+          <span>{uiText.offlineHint}</span>
+        </div>
+      ) : null}
 
       {approvingId ? (
         <div className={styles.syncBanner}>
@@ -385,9 +414,9 @@ export const TaskList: React.FC<TaskListProps> = ({
                 )}
                 <button
                   onClick={(e) => void handleDoneClick(e, a)}
-                  disabled={isProcessing}
+                  disabled={isProcessing || !isOnline}
                   className="payout-btn"
-                  style={{ zIndex: 999, position: 'relative', cursor: 'pointer' }}
+                  style={{ zIndex: 999, position: 'relative', cursor: isOnline ? 'pointer' : 'not-allowed' }}
                 >
                   {isProcessing ? (
                     <span className={styles.confirmBtnContent}>
@@ -425,6 +454,8 @@ export const TaskList: React.FC<TaskListProps> = ({
               timerLabel={uiText.timerHint}
               processingLabel={uiText.processing}
               waitingLabel={uiText.waiting}
+              disabledLabel={uiText.offline}
+              isDisabled={!isOnline}
               onTimerClick={typeof taskDuration === 'number' ? () => startTaskTimer(task.id, taskDuration) : undefined}
               onStart={() => startHolding(task)}
               onStop={stopHolding}
