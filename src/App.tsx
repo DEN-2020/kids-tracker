@@ -19,16 +19,33 @@ function App() {
   
   const [profile, setProfile] = useState<AppProfile | null>(null);
   const [t, setT] = useState<TranslationContent | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isTranslationsLoading, setIsTranslationsLoading] = useState(true);
 
   useEffect(() => {
-    const initApp = onAuthStateChanged(auth, async (user) => {
-      try {
-        // 1. Загружаем переводы
-        const translationsData = await fetchTranslations(lang);
-        setT(translationsData);
+    let isActive = true;
 
-        // 2. Загружаем профиль, если юзер залогинен
+    setIsTranslationsLoading(true);
+
+    fetchTranslations(lang)
+      .then((translationsData) => {
+        if (isActive) setT(translationsData);
+      })
+      .catch((err) => {
+        console.error("Translations loading error:", err);
+      })
+      .finally(() => {
+        if (isActive) setIsTranslationsLoading(false);
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [lang]);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      try {
         if (user) {
           const { fetchUserProfile } = await import('./services/profile');
           const data = await fetchUserProfile(user.uid);
@@ -46,17 +63,17 @@ function App() {
           setProfile(null);
         }
       } catch (err) {
-        console.error("Initialization error:", err);
+        console.error("Auth initialization error:", err);
       } finally {
-        setIsLoading(false);
+        setIsAuthLoading(false);
       }
     });
 
-    return () => initApp();
-  }, [lang]); // Перезагружаем, если сменился язык
+    return () => unsubscribe();
+  }, []);
 
   // Пока не загружены И данные, И переводы — показываем пустоту (или белый экран из index.html)
-  if (isLoading || !t) return null;
+  if (isAuthLoading || isTranslationsLoading || !t) return null;
 
   return (
     <div className="app-root">
