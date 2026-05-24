@@ -3,6 +3,7 @@ import { auth } from './firebase';
 import { onAuthStateChanged } from "firebase/auth";
 import { fetchTranslations, type TranslationContent } from './translations';
 import type { AppProfile } from './types';
+import { OfflineNotice } from './components/Layout/OfflineNotice';
 
 
 
@@ -59,6 +60,7 @@ function App() {
 
   return (
     <div className="app-root">
+      <OfflineNotice lang={lang} />
       <Suspense fallback={<div className="spinner"></div>}>
         {!profile ? (
           // Передаем t в LoginPage, так как теперь это стейт

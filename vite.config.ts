@@ -21,22 +21,48 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
-        globPatterns: ['assets/**/*.{js,css,html,webp,avif}', 'index.html'],
+        globPatterns: [
+          '**/*.{js,css,html,ico,png,svg,webmanifest,json,txt,avif,webp,mp3,wav}',
+        ],
         cleanupOutdatedCaches: true,
-     
+        navigateFallback: '/',
         dontCacheBustURLsMatching: /^assets\//, // Игнорировать хеширование для файлов в assets (у них уже есть хеш)
         maximumFileSizeToCacheInBytes: 3000000, // Увеличим лимит до 3Мб на всякий случай для bg.avif
+        runtimeCaching: [
+          {
+            urlPattern: ({ request, sameOrigin }) =>
+              sameOrigin && request.destination === 'document',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'kids-tracker-pages',
+              networkTimeoutSeconds: 3,
+              expiration: {
+                maxEntries: 10,
+                maxAgeSeconds: 60 * 60 * 24 * 7,
+              },
+            },
+          },
+        ],
       },
       manifest: {
+        id: '/',
         name: 'Kids Tracker 2026',
         short_name: 'KidsTracker',
-        description: 'Family Task & Reward System',
-        theme_color: '#007AFF', 
+        description: 'Family task, reward, and motivation tracker for kids and parents.',
+        lang: 'en',
+        start_url: '/',
+        scope: '/',
+        display: 'standalone',
+        orientation: 'portrait',
+        background_color: '#f8fafc',
+        theme_color: '#0f172a',
+        categories: ['productivity', 'kids', 'family'],
         icons: [
           {
             src: 'pwa-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
             src: 'pwa-512x512.png',
@@ -44,7 +70,16 @@ export default defineConfig({
             type: 'image/png',
             purpose: 'any maskable'
           }
-        ]
+        ],
+        shortcuts: [
+          {
+            name: 'Tasks',
+            short_name: 'Tasks',
+            description: 'Open the daily task list',
+            url: '/',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          }
+        ],
       }
     })
   ],

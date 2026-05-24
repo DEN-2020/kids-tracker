@@ -1,2 +1,4 @@
 User-agent: *
 Allow: /
+
+Sitemap: https://kidstracker-ed3e9.web.app/sitemap.xml

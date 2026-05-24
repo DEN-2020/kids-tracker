@@ -9,6 +9,8 @@ const App = lazy(() => import('./App.tsx'));
 // 2. ВЫНОСИМ PWA В ОТДЕЛЬНУЮ ФУНКЦИЮ
 // Чтобы не блокировать основной поток при загрузке
 const initPWA = async () => {
+  if (!('serviceWorker' in navigator)) return;
+
   const { registerSW } = await import('virtual:pwa-register');
   const updateSW = registerSW({
     immediate: false,
@@ -23,7 +25,20 @@ const initPWA = async () => {
   });
 };
 
-initPWA();
+const schedulePWAInit = () => {
+  const idleWindow = window as Window & {
+    requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+  };
+
+  if (idleWindow.requestIdleCallback) {
+    idleWindow.requestIdleCallback(() => void initPWA(), { timeout: 3000 });
+    return;
+  }
+
+  globalThis.setTimeout(() => void initPWA(), 1000);
+};
+
+schedulePWAInit();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
