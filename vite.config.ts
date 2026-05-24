@@ -93,16 +93,34 @@ build: {
   rollupOptions: {
     output: {
 manualChunks(id) {
+  const normalizedId = id.replace(/\\/g, '/');
+
   if (id.includes('node_modules')) {
     // 1. Графики - отдельно (они огромные и нужны редко)
-    if (id.includes('recharts')) return 'charts';
+    if (normalizedId.includes('recharts')) return 'charts';
 
-    // 2. Весь Firebase - в один чанк. 
-    // Это предотвратит Circular Dependency и ошибки инициализации.
-    if (id.includes('firebase')) return 'firebase-bundle';
+    if (normalizedId.includes('/@firebase/auth') || normalizedId.includes('/firebase/auth')) {
+      return 'firebase-auth';
+    }
+
+    if (normalizedId.includes('/@firebase/firestore') || normalizedId.includes('/firebase/firestore')) {
+      return 'firebase-firestore';
+    }
+
+    if (normalizedId.includes('/@firebase/functions') || normalizedId.includes('/firebase/functions')) {
+      return 'firebase-functions';
+    }
+
+    if (normalizedId.includes('/@firebase/storage') || normalizedId.includes('/firebase/storage')) {
+      return 'firebase-storage';
+    }
+
+    if (normalizedId.includes('/@firebase/') || normalizedId.includes('/firebase/')) {
+      return 'firebase-core';
+    }
 
     // 3. Ядро Реакта - отдельно
-    if (id.includes('react-dom')) return 'vendor-dom';
+    if (normalizedId.includes('react-dom')) return 'vendor-dom';
 
     // Все остальное (мелкие либы)
     return 'vendor';

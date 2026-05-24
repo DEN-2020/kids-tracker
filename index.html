@@ -28,7 +28,6 @@
 
   <link rel="preconnect" href="https://www.googleapis.com">
   <link rel="dns-prefetch" href="https://apis.google.com">
-  <link rel="manifest" href="/manifest.webmanifest">
 
   <script>
     // МГНОВЕННОЕ ОПРЕДЕЛЕНИЕ ТЕМЫ
@@ -72,6 +71,14 @@
     z-index: 9999;
   }
 
+  .loading-brand {
+    margin-bottom: 20px;
+    color: var(--text-loader);
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1.15;
+  }
+
   .spinner {
     width: 42px;
     height: 42px;
@@ -95,6 +102,7 @@
 <body>
   <div id="root">
     <div id="loader-container">
+      <div class="loading-brand">Kids Tracker</div>
       <div class="spinner"></div>
       <div class="loading-text">Ladataan...</div>
     </div>
