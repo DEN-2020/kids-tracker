@@ -9,6 +9,7 @@ const db = getFirestore();
 const COLLECTIONS = {
   approvals: 'approvals',
   catalog: 'achievements_list',
+  deviceUsage: 'device_usage',
   history: 'history',
   tasks: 'tasks_list',
   users: 'users',
@@ -224,6 +225,44 @@ const mapCatalogPayload = (item, familyId) => {
   }
 
   return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== null));
+};
+
+const normalizeUsageDayKey = (value) => {
+  const dayKey = normalizeString(value) || getLocalDayKey();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) {
+    throw new HttpsError('invalid-argument', 'Invalid usage day key.');
+  }
+
+  return dayKey;
+};
+
+const mapDeviceUsageApps = (apps) => {
+  if (!Array.isArray(apps)) {
+    throw new HttpsError('invalid-argument', 'Usage apps must be a list.');
+  }
+
+  if (apps.length > 100) {
+    throw new HttpsError('invalid-argument', 'Usage app list is too large.');
+  }
+
+  return apps
+    .map((app) => {
+      const packageName = normalizeString(app?.packageName).slice(0, 180);
+      const appName = normalizeString(app?.appName).slice(0, 120) || packageName;
+      const foregroundMs = Math.max(0, Math.floor(Number(app?.foregroundMs) || 0));
+      const lastUsedMs = Math.max(0, Math.floor(Number(app?.lastUsedMs) || 0));
+
+      if (!packageName || foregroundMs <= 0) return null;
+
+      return {
+        appName,
+        foregroundMs,
+        lastUsedMs,
+        packageName,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.foregroundMs - left.foregroundMs);
 };
 
 export const registerProfile = onCall(async (request) => {
@@ -773,6 +812,44 @@ export const activateAchievement = onCall(async (request) => {
   });
 
   return { ok: true };
+});
+
+export const syncDeviceUsage = onCall(async (request) => {
+  const uid = assertAuth(request.auth);
+  const profile = await requireProfile(uid);
+
+  const requestedUserId = normalizeString(request.data?.userId) || uid;
+  if (requestedUserId !== uid) {
+    assertRole(profile, 'parent');
+  }
+
+  const targetUser = await requireSameFamilyDocument(COLLECTIONS.users, requestedUserId, profile.familyId);
+  const dayKey = normalizeUsageDayKey(request.data?.dayKey);
+  const apps = mapDeviceUsageApps(request.data?.apps);
+  const totalForegroundMs = apps.reduce((sum, app) => sum + app.foregroundMs, 0);
+
+  if (totalForegroundMs <= 0) {
+    throw new HttpsError('invalid-argument', 'Usage payload is empty.');
+  }
+
+  const docId = `${profile.familyId}_${targetUser.id}_${dayKey}`;
+  const payload = {
+    apps,
+    dayKey,
+    familyId: profile.familyId,
+    sourceAuthUid: uid,
+    totalForegroundMs,
+    updatedAt: FieldValue.serverTimestamp(),
+    userId: targetUser.id,
+  };
+
+  await db.collection(COLLECTIONS.deviceUsage).doc(docId).set(payload, { merge: true });
+
+  return {
+    dayKey,
+    id: docId,
+    totalForegroundMs,
+  };
 });
 
 export const upsertFamilyMember = onCall(async (request) => {

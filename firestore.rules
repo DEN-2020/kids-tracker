@@ -95,6 +95,13 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    match /device_usage/{usageId} {
+      allow read: if isSignedIn() && resourceInOwnFamily() &&
+        (resource.data.userId == selfUid() || isParent());
+
+      allow create, update, delete: if false;
+    }
+
     match /achievements_list/{itemId} {
       allow read: if isSignedIn() && resourceInOwnFamily();
       allow create: if isSignedIn() && isParent() && requestInOwnFamily();
